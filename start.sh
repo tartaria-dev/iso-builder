@@ -134,6 +134,7 @@ if [ "$INCLUDE_CONTAINER_IN_ISO" = "yes" ]; then
     mkdir -p /etc/containers'
 
   # Set storage driver to vfs to avoid needing fuse-overlayfs
+  podman-chroot podman system reset --force
   podman-chroot 'cat > /etc/containers/storage.conf <<EOF
 [storage]
 driver = "vfs"
