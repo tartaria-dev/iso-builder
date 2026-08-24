@@ -3,6 +3,7 @@
 _SCRIPTDIR=$(dirname "$0")
 [ -f $_SCRIPTDIR/config.sh ] && source $_SCRIPTDIR/config.sh
 SQUASHFS_CTR_IMG=${1:-$SQUASHFS_CTR_IMG}
+INCLUDE_CONTAINER_IN_ISO=false
 
 if [ "$EUID" -ne 0 ]; then
   echo "This script must be ran as root."
