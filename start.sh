@@ -129,12 +129,11 @@ github-step-end
 if [ "$INCLUDE_CONTAINER_IN_ISO" = "yes" ]; then
   github-step "Include base container image in ISO"
 
-  podman-chroot 'pacman -Sy --needed --noconfirm podman && \
+  podman-chroot 'rm -rf /etc/containers /var/lib/containers/storage && \
     mkdir -p /var/lib/containers/storage && \
     mkdir -p /etc/containers'
 
   # Set storage driver to vfs to avoid needing fuse-overlayfs
-  podman-chroot 'podman system reset --force'
   podman-chroot 'cat > /etc/containers/storage.conf <<EOF
 [storage]
 driver = "vfs"
