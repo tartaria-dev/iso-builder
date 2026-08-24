@@ -129,7 +129,7 @@ github-step-end
 if [ "$INCLUDE_CONTAINER_IN_ISO" = "yes" ]; then
   github-step "Include base container image in ISO"
 
-  podman-chroot 'rm -rf /etc/containers /var/lib/containers/storage && \
+  podman-chroot 'pacman -Sy --needed --noconfirm podman && \
     mkdir -p /var/lib/containers/storage && \
     mkdir -p /etc/containers'
 
