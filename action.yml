@@ -23,11 +23,10 @@ runs:
   steps:
     - name: Build ISO
       run: |
-        sudo ${{ github.action_path }}/start.sh ${{ inputs.container-image }} ${{ github.action_path }}/out/ ${{ inputs.iso-name }}
+        sudo ${{ github.action_path }}/start.sh ${{ inputs.container-image }} ${{ inputs.iso-path }} ${{ inputs.iso-name }}
         
         mkdir -p "$(dirname ${{ inputs.iso-path }})"
         sudo chown $(whoami):$(whoami) ${{ github.action_path }}/out/${{ inputs.iso-name }}.iso
-        sudo mv ${{ github.action_path }}/out/${{ inputs.iso-name }}.iso "${{ inputs.iso-path }}"
-        echo "iso-path=$(realpath ${{ inputs.iso-path }})" >> $GITHUB_OUTPUT
+        ls -lah ${{ inputs.iso-path }}
       shell:
         bash
