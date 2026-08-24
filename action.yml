@@ -9,6 +9,9 @@ inputs:
   iso-path:
     description: "Path to move the resulting ISO to"
     required: true
+  iso-name:
+    description: "Name to use for the ISO"
+    required: true
 
 outputs:
   iso-path:
@@ -20,11 +23,11 @@ runs:
   steps:
     - name: Build ISO
       run: |
-        sudo ${{ github.action_path }}/start.sh ${{ inputs.container-image }} ${{ github.action_path }}/out/
+        sudo ${{ github.action_path }}/start.sh ${{ inputs.container-image }} ${{ github.action_path }}/out/ ${{ inputs.iso-name }}
         
         mkdir -p "$(dirname ${{ inputs.iso-path }})"
-        sudo chown $(whoami):$(whoami) ${{ github.action_path }}/out/tartaria.iso
-        sudo mv ${{ github.action_path }}/out/tartaria.iso "${{ inputs.iso-path }}"
+        sudo chown $(whoami):$(whoami) ${{ github.action_path }}/out/${{ inputs.iso-name }}.iso
+        sudo mv ${{ github.action_path }}/out/${{ inputs.iso-name }}.iso "${{ inputs.iso-path }}"
         echo "iso-path=$(realpath ${{ inputs.iso-path }})" >> $GITHUB_OUTPUT
       shell:
         bash

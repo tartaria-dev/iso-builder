@@ -11,7 +11,8 @@ shopt -s nullglob
 
 SQUASHFS_CTR_IMG_ROOTFS=/rootfs
 GRUB_FILE_PATH=${GRUB_FILE_PATH:?}
-OUTPUT_ISO_FILE=/out/tartaria.iso
+ISO_NAME=${ISO_NAME:-tartaria}
+OUTPUT_ISO_FILE=/out/${ISO_NAME}.iso
 export DRACUT_NO_XATTR=1
 
 die() {

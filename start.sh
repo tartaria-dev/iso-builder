@@ -4,6 +4,7 @@ _SCRIPTDIR=$(dirname "$0")
 [ -f $_SCRIPTDIR/config.sh ] && source $_SCRIPTDIR/config.sh
 SQUASHFS_CTR_IMG=${1:-$SQUASHFS_CTR_IMG}
 OUT_DIR=${2:-./out}
+ISO_NAME=${3:-${ISO_NAME:-tartaria}}
 
 if [ "$EUID" -ne 0 ]; then
   echo "This script must be ran as root."
@@ -218,6 +219,7 @@ podman run \
     --security-opt label=type:unconfined_t \
     --env ISO_ENVIRONMENT=true \
     --env GRUB_FILE_PATH=/grub.cfg \
+    --env ISO_NAME="${ISO_NAME}" \
     --env SQUASHFS_CTR_IMAGE_MOUNTPOINT="${SQUASHFS_CTR_IMAGE_MOUNTPOINT}" \
     -v "$_SCRIPTDIR"/grub.cfg:/grub.cfg:ro \
     -v "$_SCRIPTDIR"/build_iso.sh:/build_iso.sh:ro \
