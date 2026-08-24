@@ -26,7 +26,7 @@ runs:
         sudo ${{ github.action_path }}/start.sh ${{ inputs.container-image }} ${{ inputs.iso-path }} ${{ inputs.iso-name }}
         
         mkdir -p ${{ inputs.iso-path }}
-        sudo chown $(whoami):$(whoami) ${{ inputs.iso-path }}/${{ inputs.iso-name }}.iso
+        sudo chown -R $(whoami):$(whoami) ${{ inputs.iso-path }}
         ls -lah ${{ inputs.iso-path }}
       shell:
         bash
