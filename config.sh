@@ -7,4 +7,4 @@
 
 # Determines whether the OCI image specified in $SQUASHFS_CTR_IMG will be included as an image in the final ISO's podman storage.
 # Valid values are "yes" and "no"
-INCLUDE_CONTAINER_IN_ISO=yes
+#INCLUDE_CONTAINER_IN_ISO=yes

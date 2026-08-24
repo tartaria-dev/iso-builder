@@ -23,8 +23,8 @@ runs:
         sudo ${{ github.action_path }}/start.sh ${{ inputs.container-image }} ${{ github.action_path }}/out/
         
         mkdir -p "$(dirname ${{ inputs.iso-path }})"
-        sudo chown $(whoami):$(whoami) ${{ github.action_path }}/out/cuckoo.iso
-        sudo mv ${{ github.action_path }}/out/cuckoo.iso "${{ inputs.iso-path }}"
+        sudo chown $(whoami):$(whoami) ${{ github.action_path }}/out/tartaria.iso
+        sudo mv ${{ github.action_path }}/out/tartaria.iso "${{ inputs.iso-path }}"
         echo "iso-path=$(realpath ${{ inputs.iso-path }})" >> $GITHUB_OUTPUT
       shell:
         bash

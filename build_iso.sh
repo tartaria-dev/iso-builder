@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ "$CUCKOO_ENVIRONMENT" != true ]; then
+if [ "$ISO_ENVIRONMENT" != true ]; then
   echo "This script is not intended to be ran outside of the podman environment. Please use the start.sh script that exists in the same folder."
   exit 1
 fi
@@ -11,7 +11,7 @@ shopt -s nullglob
 
 SQUASHFS_CTR_IMG_ROOTFS=/rootfs
 GRUB_FILE_PATH=${GRUB_FILE_PATH:?}
-OUTPUT_ISO_FILE=/out/cuckoo.iso
+OUTPUT_ISO_FILE=/out/tartaria.iso
 export DRACUT_NO_XATTR=1
 
 die() {
@@ -67,7 +67,7 @@ mcopy -v -i uefi.img -s "iso_files/EFI" ::
 mkdir -p "$(dirname "${OUTPUT_ISO_FILE}")"
 xorriso -as mkisofs \
     -R \
-    -V "cuckoo_boot" \
+    -V "tartaria_boot" \
     -partition_offset 16 \
     -appended_part_as_gpt \
     -append_partition 2 C12A7328-F81F-11D2-BA4B-00A0C93EC93B ./uefi.img \
