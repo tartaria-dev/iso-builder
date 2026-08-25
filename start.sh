@@ -194,7 +194,7 @@ podman-chroot 'kver=$(find /usr/lib/modules -maxdepth 1 -printf "%P" | head -1) 
     --reproducible \
     --no-hostonly \
     --no-hostonly-cmdline \
-    --add "dmsquash-live dmsquash-live-autooverlay udev-dracut" \
+    --add "dmsquash-live dmsquash-live-autooverlay" \
     --filesystems "iso9660 vfat" \
     --force-drivers "usb_storage uas xhci_pci ahci" \
     --force \
