@@ -79,15 +79,13 @@ function custom_pre_hooks(){
   set -euo pipefail
   github-step "Custom Pre Hooks"
 
-  # This hook will run before any other commands are ran.
-  # Put your custom commands here. examples are below.
-  #
-  # Sets hostname to "archiso"
-  #podman-chroot 'rm -f /etc/hostname && echo archiso > /etc/hostname'
+  # install the installer
+  podman-chroot 'curl -Lo installer.flatpak \
+    https://github.com/projectbluefin/bootc-installer/releases/download/latest-stable/org.bootcinstaller.Installer.flatpak \
+    && flatpak uninstall -y org.bootcinstaller.Installer org.bootcos.Installer 2>/dev/null; flatpak install --bundle -y installer.flatpak'
 
-  # Installs a linux kernel with device firmware. This is important if your image doesn't include a kernel, which the official Arch Linux docker image does not.
-  #podman-chroot 'mkdir -p /etc/mkinitcpio.d && touch /etc/mkinitcpio.d/linux.preset && \
-  #  pacman -Sy --needed --noconfirm linux linux-firmware && rm -f /boot/*'
+  # set autologin
+  podman-chroot 'sed -i '/vt = 1/a \\[initial_session]\ncommand = "niri-session"\nuser = "liveuser"\n' /etc/greetd/config.toml'
 
   github-step-end
 }
@@ -95,9 +93,6 @@ function custom_pre_hooks(){
 function custom_post_hooks(){
   set -euo pipefail
   github-step "Custom Post Hooks"
-
-  # This hook will run after all commands are ran.
-  # Put your custom commands here.
 
   github-step-end
 }
