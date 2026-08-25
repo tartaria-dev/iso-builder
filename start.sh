@@ -80,9 +80,8 @@ function custom_pre_hooks(){
   github-step "Custom Pre Hooks"
 
   # install the installer
-  podman-chroot 'curl -Lo installer.flatpak \
-    https://github.com/projectbluefin/bootc-installer/releases/download/latest-stable/org.bootcinstaller.Installer.flatpak \
-    && flatpak uninstall -y org.bootcinstaller.Installer org.bootcos.Installer 2>/dev/null; flatpak install --bundle -y installer.flatpak'
+  podman-chroot 'curl -Lo installer.flatpak https://github.com/projectbluefin/bootc-installer/releases/download/latest-stable/org.bootcinstaller.Installer.flatpak'
+  podman-chroot 'flatpak install --bundle -y installer.flatpak'
 
   # set autologin
   podman-chroot 'sed -i '/vt = 1/a \\[initial_session]\ncommand = "niri-session"\nuser = "liveuser"\n' /etc/greetd/config.toml'
