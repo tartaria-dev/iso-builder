@@ -194,9 +194,9 @@ podman-chroot 'kver=$(find /usr/lib/modules -maxdepth 1 -printf "%P" | head -1) 
     --reproducible \
     --no-hostonly \
     --no-hostonly-cmdline \
-    --add "dmsquash-live dmsquash-live-autooverlay" \
-    --filesystems "squashfs overlay" \
-    --add-drivers "loop" \
+    --add "dm dmsquash-live dmsquash-live-autooverlay" \
+    --filesystems "squashfs overlay ext4" \
+    --force-drivers "dm_mod loop" \
     --force \
     /live-initramfs.img'
 
