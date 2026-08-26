@@ -97,6 +97,9 @@ function custom_pre_hooks(){
   podman-chroot 'su builder -c "cd /buildhome/bootc-installer && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
   podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
 
+  # create bootc-installer conf dir
+  podman-chroot 'mkdir -p /etc/bootc-installer'
+
   # remove build pkgs
   podman-chroot 'pacman -Rns --noconfirm ninja meson blueprint-compiler'
 
