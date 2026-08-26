@@ -79,12 +79,30 @@ function custom_pre_hooks(){
   set -euo pipefail
   github-step "Custom Pre Hooks"
 
-  # install the installer
-  podman-chroot 'curl -Lo installer.flatpak https://github.com/projectbluefin/bootc-installer/releases/download/latest-stable/org.bootcinstaller.Installer.flatpak'
-  podman-chroot 'flatpak install --bundle -y installer.flatpak'
+  # configure liveuser
+  podman-chroot 'sed -i "/vt = 1/a \\[initial_session]\ncommand = \"niri-session\"\nuser = \"liveuser\"\n" /etc/greetd/config.toml'
+  podman-chroot "echo 'polkit.addRule(function(action, subject) { if (subject.user == \"liveuser\") { return polkit.Result.YES; } });' | tee /etc/polkit-1/rules.d/49-liveuser.rules > /dev/null"
 
-  # set autologin
-  podman-chroot 'sed -i '/vt = 1/a \\[initial_session]\ncommand = "niri-session"\nuser = "liveuser"\n' /etc/greetd/config.toml'
+  # install the installer (oh my god so gosh darn cool amiright)
+  podman-chroot 'curl -Lo installer.flatpak https://github.com/projectbluefin/bootc-installer/releases/download/v3.0.16/org.bootcinstaller.Installer.flatpak'
+  podman-chroot 'flatpak install --bundle -y installer.flatpak'
+  podman-chroot 'mkdir -p /etc/bootc-installer'
+
+  # add installer recipe
+  case "$ISO_NAME" in
+    *arch)
+        podman-chroot 'cp /app/recipes/arch /etc/bootc-installer/recipe.json'
+        ;;
+    *arch-sealed)
+        podman-chroot 'cp /app/recipes/arch-sealed /etc/bootc-installer/recipe.json'
+        ;;
+    *cachy)
+        podman-chroot 'cp /app/recipes/cachy /etc/bootc-installer/recipe.json'
+        ;;
+    *cachy-sealed)
+        podman-chroot 'cp /app/recipes/cachy-sealed /etc/bootc-installer/recipe.json'
+        ;;
+  esac
 
   github-step-end
 }

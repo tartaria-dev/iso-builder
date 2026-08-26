@@ -1,0 +1,65 @@
+{
+  "log_file": "/tmp/bootc-installer.log",
+  "distro_name": "Tartaria",
+  "distro_logo": "/usr/share/pixmaps/tartaria.svg",
+  "imgref": "ghcr.io/tartaria-dev/tartaria:stable-cachy",
+  "hostname": "tartarbox",
+  "selinuxDisabled": false,
+  "unifiedStorage": true,
+  "distroID": "tartaria",
+  "brewTap": "ublue-os/tap",
+
+  "images": [
+    {
+      "name": "Tartaria",
+      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-cachy",
+      "bootloader": "grub2",
+      "filesystem": "btrfs",
+      "composefs": false,
+      "needs_user_creation": true,
+    }
+  ],
+
+  "welcome_title": "Welcome to Tartaria!",
+  "welcome_subtitle": "A fancy Arch/CachyOSv3 based bootc image that stays out of your way.",
+  "store_url": "",
+  "store_qr_resource": "",
+  "credits_data": "",
+  "soundtrack_data": "",
+
+  "tour": {
+    "welcome": {
+      "resource": "/org/bootcinstaller/Installer/assets/welcome.png",
+      "title": "Installing Tartaria...",
+      "description": "This process may take a few minutes."
+    },
+    "completed": {
+      "resource": "/org/bootcinstaller/Installer/assets/complete.svg",
+      "title": "Installation Complete!",
+      "description": "Your system is ready to use."
+    }
+  },
+
+  "steps": {
+    "welcome": {
+      "template": "welcome",
+      "protected": true
+    },
+    "conn_check": {
+      "template": "conn-check"
+    },
+    "disk": {
+      "template": "disk"
+    },
+    "encryption": {
+      "template": "encryption"
+    },
+    "user": {
+      "template": "user"
+    },
+    "slurp": {
+      "template": "slurp",
+      "display-conditions": ["test -b /dev/disk/by-label/Windows"]
+    }
+  }
+}
