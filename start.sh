@@ -82,7 +82,7 @@ function custom_pre_hooks(){
   # configure liveuser
   podman-chroot 'sed -i "/vt = 1/a \\[initial_session]\ncommand = \"niri-session\"\nuser = \"liveuser\"\n" /etc/greetd/config.toml'
   podman-chroot "echo 'polkit.addRule(function(action, subject) { if (subject.user == \"liveuser\") { return polkit.Result.YES; } });' | tee /etc/polkit-1/rules.d/49-liveuser.rules > /dev/null"
-  podman-chroot 'sed -i '1i spawn-sh-at-startup "bootc-installer"' /usr/share/tartaria/cherries/dot_config/niri/config.kdl'
+  podman-chroot "sed -i '1i spawn-sh-at-startup \"bootc-installer\"' /usr/share/tartaria/cherries/dot_config/niri/config.kdl"
 
   # create temp build user
   podman-chroot 'useradd -U builder'
