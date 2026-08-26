@@ -90,7 +90,7 @@ function custom_pre_hooks(){
   podman-chroot 'chown builder:builder /buildhome'
 
   # install necessary build pkgs
-  podman-chroot 'pacman -S --noconfirm --needed ninja meson >/dev/null'
+  podman-chroot 'pacman -S --noconfirm --needed ninja meson blueprint-compiler >/dev/null'
   
   # clone bootc-installer and install it
   podman-chroot 'su builder -c "git clone --recurse-submodules -b v3.0.16 --depth 1 https://github.com/projectbluefin/bootc-installer /buildhome/bootc-installer" >/dev/null'
@@ -98,7 +98,7 @@ function custom_pre_hooks(){
   podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
 
   # remove build pkgs
-  podman-chroot 'pacman -Rns --noconfirm ninja meson'
+  podman-chroot 'pacman -Rns --noconfirm ninja meson blueprint-compiler'
 
   # add installer recipe
   case "$ISO_NAME" in
