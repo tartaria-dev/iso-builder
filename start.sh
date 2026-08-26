@@ -90,12 +90,12 @@ function custom_pre_hooks(){
   podman-chroot 'chown builder:builder /buildhome'
 
   # install necessary build pkgs
-  podman-chroot 'pacman -S --noconfirm --needed ninja meson'
+  podman-chroot 'pacman -S --noconfirm --needed ninja meson >/dev/null'
   
   # clone bootc-installer and install it
-  podman-chroot 'su - builder -c "git clone -b v3.0.16 --depth 1 https://github.com/projectbluefin/bootc-installer /buildhome/bootc-installer" >/dev/null'
-  podman-chroot 'su - builder -c "cd /buildhome/bootc-installer && meson setup build && ninja -C build && sudo ninja -C build install" >/dev/null'
-  podman-chroot 'rm -rf /buildhome /etc/sudoers.d'
+  podman-chroot 'su builder -c "git clone -b v3.0.16 --depth 1 https://github.com/projectbluefin/bootc-installer /buildhome/bootc-installer" >/dev/null'
+  podman-chroot 'su builder -c "cd /buildhome/bootc-installer && meson setup build && ninja -C build && sudo ninja -C build install"'
+  podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
 
   # remove build pkgs
   podman-chroot 'pacman -Rns --noconfirm ninja meson'
