@@ -82,11 +82,23 @@ function custom_pre_hooks(){
   # configure liveuser
   podman-chroot 'sed -i "/vt = 1/a \\[initial_session]\ncommand = \"niri-session\"\nuser = \"liveuser\"\n" /etc/greetd/config.toml'
   podman-chroot "echo 'polkit.addRule(function(action, subject) { if (subject.user == \"liveuser\") { return polkit.Result.YES; } });' | tee /etc/polkit-1/rules.d/49-liveuser.rules > /dev/null"
+  podman-chroot 'sed -i '1i spawn-sh-at-startup "bootc-installer"' /usr/share/tartaria/cherries/dot_config/niri/config.kdl'
 
-  # install the installer (oh my god so gosh darn cool amiright)
-  podman-chroot 'curl -Lo installer.flatpak https://github.com/projectbluefin/bootc-installer/releases/download/v3.0.16/org.bootcinstaller.Installer.flatpak'
-  podman-chroot 'flatpak install --bundle -y installer.flatpak'
-  podman-chroot 'mkdir -p /etc/bootc-installer'
+  # create temp build user
+  podman-chroot 'useradd -U builder'
+  podman-chroot 'mkdir -p /etc/sudoers.d /buildhome && echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder'
+  podman-chroot 'chown builder:builder /buildhome'
+
+  # install necessary build pkgs
+  podman-chroot 'pacman -S --noconfirm --needed ninja meson'
+  
+  # clone bootc-installer and install it
+  podman-chroot 'su - builder -c "git clone -b v3.0.16 --depth 1 https://github.com/projectbluefin/bootc-installer /buildhome/bootc-installer" >/dev/null'
+  podman-chroot 'su - builder -c "cd /buildhome/bootc-installer && meson setup build && ninja -C build && sudo ninja -C build install" >/dev/null'
+  podman-chroot 'rm -rf /buildhome /etc/sudoers.d'
+
+  # remove build pkgs
+  podman-chroot 'pacman -Rns --noconfirm ninja meson'
 
   # add installer recipe
   case "$ISO_NAME" in
