@@ -90,11 +90,11 @@ function custom_pre_hooks(){
   podman-chroot 'chown builder:builder /buildhome'
 
   # install necessary build pkgs
-  podman-chroot 'pacman -S --noconfirm --needed ninja meson blueprint-compiler >/dev/null'
+  podman-chroot 'pacman -S --noconfirm --needed ninja meson blueprint-compiler mutter >/dev/null'
   
   # clone bootc-installer and install it
   podman-chroot 'su builder -c "git clone --recurse-submodules -b v3.0.16 --depth 1 https://github.com/projectbluefin/bootc-installer /buildhome/bootc-installer" >/dev/null'
-  podman-chroot 'su builder -c "cd /buildhome/bootc-installer && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
+  podman-chroot 'su builder -c "cd /buildhome/bootc-installer && git apply /app/installer-patches/disable-custom-image-field.patch && git apply fix-distro-branding.patch && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
   podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
 
   # create bootc-installer conf dir
@@ -106,16 +106,10 @@ function custom_pre_hooks(){
   # add installer recipe
   case "$ISO_NAME" in
     *arch)
-        podman-chroot 'cp /app/recipes/arch /etc/bootc-installer/recipe.json'
-        ;;
-    *arch-sealed)
-        podman-chroot 'cp /app/recipes/arch-sealed /etc/bootc-installer/recipe.json'
+        podman-chroot 'cp /app/installer-recipes/arch /etc/bootc-installer/recipe.json'
         ;;
     *cachy)
-        podman-chroot 'cp /app/recipes/cachy /etc/bootc-installer/recipe.json'
-        ;;
-    *cachy-sealed)
-        podman-chroot 'cp /app/recipes/cachy-sealed /etc/bootc-installer/recipe.json'
+        podman-chroot 'cp /app/installer-recipes/cachy /etc/bootc-installer/recipe.json'
         ;;
   esac
 

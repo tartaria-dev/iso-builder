@@ -2,8 +2,8 @@
   "log_file": "/tmp/bootc-installer.log",
   "distro_name": "Tartaria",
   "distro_logo": "/usr/share/pixmaps/tartaria.svg",
-  "imgref": "ghcr.io/tartaria-dev/tartaria:stable-arch-sealed",
   "hostname": "tartarbox",
+  "allow_custom_image": false,
   "selinuxDisabled": false,
   "unifiedStorage": true,
   "distroID": "tartaria",
@@ -11,12 +11,20 @@
 
   "images": [
     {
-      "name": "Tartaria",
-      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-arch-sealed",
+      "name": "Tartaria (Sealed)",
+      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-cachy-sealed",
       "bootloader": "systemd",
       "filesystem": "btrfs",
       "composefs": true,
-      "needs_user_creation": true,
+      "needs_user_creation": true
+    },
+    {
+      "name": "Tartaria (Unsealed)",
+      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-cachy",
+      "bootloader": "grub2",
+      "filesystem": "btrfs",
+      "composefs": false,
+      "needs_user_creation": true
     }
   ],
 
@@ -47,6 +55,9 @@
     },
     "conn_check": {
       "template": "conn-check"
+    },
+    "image": {
+      "template": "image"
     },
     "disk": {
       "template": "disk"
