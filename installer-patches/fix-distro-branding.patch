@@ -55,7 +55,7 @@ index f0124226..c3a54902 100644
      """Parse one fisherman log line and return a UI-update dict, or None.
  
      Pure function — no GTK, no I/O.  The returned dict has:
-@@ -53,6 +53,6 @@ def apply_progress_event(line: str, state: dict) -> dict | None:
+@@ -53,6 +53,7 @@ def apply_progress_event(line: str, state: dict) -> dict | None:
        "pulse"     — bool; True means switch bar to pulse mode
        "complete"  — bool; True means install finished
      ``state`` is mutated in-place to track multi-line context.
