@@ -11,19 +11,35 @@
 
   "images": [
     {
-      "name": "Tartaria (Sealed)",
-      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-arch-sealed",
+      "name": "Tartaria (Berbere)",
+      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-arch-bebere",
+      "bootloader": "grub2",
+      "filesystem": "btrfs",
+      "composefs": false,
+      "needs_user_creation": true
+    },
+    {
+      "name": "Tartaria (Amchoor)",
+      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-arch-amchoor",
+      "bootloader": "grub2",
+      "filesystem": "btrfs",
+      "composefs": false,
+      "needs_user_creation": true
+    },
+    {
+      "name": "Tartaria (Mahleb)",
+      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-arch-mahleb",
       "bootloader": "systemd",
       "filesystem": "btrfs",
       "composefs": true,
       "needs_user_creation": true
     },
     {
-      "name": "Tartaria (Unsealed)",
-      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-arch",
-      "bootloader": "grub2",
+      "name": "Tartaria (Saffron)",
+      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-arch-saffron",
+      "bootloader": "systemd",
       "filesystem": "btrfs",
-      "composefs": false,
+      "composefs": true,
       "needs_user_creation": true
     }
   ],
