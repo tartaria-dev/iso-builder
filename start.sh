@@ -95,8 +95,19 @@ function custom_pre_hooks(){
   
   # clone bootc-installer and install it
   podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules -b v3.0.16 --depth 1 https://github.com/projectbluefin/bootc-installer /buildhome/bootc-installer"'
-  podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && for patch in /app/installer-patches/*.patch; do git apply \"\$patch\"; done"'
+  podman-chroot 'runuser -u builder -- bash -c "
+    set -euo pipefail
+    cd /buildhome/bootc-installer
+    for patch in /app/installer-patches/*.patch; do
+      echo \">>> Applying \$patch\"
+      git apply \"\$patch\"
+    done
+    echo \">>> All patches applied cleanly\"
+  "'
   podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
+  podman-chroot 'grep -q "disable_live_iso_detection" /usr/share/org.bootcinstaller.Installer/bootc_installer/utils/recipe.py \
+    && echo ">>> Patch verification: OK" \
+    || { echo ">>> Patch verification FAILED — disable_live_iso_detection not found in installed recipe.py"; exit 1; }'
   podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
 
   # create bootc-installer conf dir
