@@ -106,10 +106,10 @@ function custom_pre_hooks(){
 
   # add installer recipe
   case "$ISO_NAME" in
-    *arch)
+    *arch*)
         podman-chroot 'cp /app/installer-recipes/arch /etc/bootc-installer/recipe.json'
         ;;
-    *cachy)
+    *cachy*)
         podman-chroot 'cp /app/installer-recipes/cachy /etc/bootc-installer/recipe.json'
         ;;
   esac
