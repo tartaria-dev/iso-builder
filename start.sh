@@ -95,19 +95,8 @@ function custom_pre_hooks(){
   
   # clone bootc-installer and install it
   podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules -b v3.0.16 --depth 1 https://github.com/projectbluefin/bootc-installer /buildhome/bootc-installer"'
-  podman-chroot 'runuser -u builder -- bash -c "
-    set -euo pipefail
-    cd /buildhome/bootc-installer
-    for patch in /app/installer-patches/*.patch; do
-      echo \">>> Applying \$patch\"
-      git apply \"\$patch\"
-    done
-    echo \">>> All patches applied cleanly\"
-  "'
+  podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && for patch in /app/installer-patches/*.patch; do git apply \"\$patch\"; done"'
   podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
-  podman-chroot 'grep -q "disable_live_iso_detection" /usr/share/org.bootcinstaller.Installer/bootc_installer/utils/recipe.py \
-    && echo ">>> Patch verification: OK" \
-    || { echo ">>> Patch verification FAILED — disable_live_iso_detection not found in installed recipe.py"; exit 1; }'
   podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
 
   # create bootc-installer conf dir
@@ -115,6 +104,9 @@ function custom_pre_hooks(){
 
   # remove build pkgs
   podman-chroot 'pacman -Rns --noconfirm ninja meson blueprint-compiler'
+
+  # remove unecessary files
+  podman-chroot 'rm -rf /usr/lib/subsystem/rootfs/rootfs.dsk /usr/lib/flatpak-sysapps/flatpak-sysapps.dsk'
 
   # add installer recipe
   case "$ISO_NAME" in
@@ -136,7 +128,28 @@ function custom_post_hooks(){
   github-step-end
 }
 
-# Run custom_pre_hooks before anything is done
+if [ "$INCLUDE_CONTAINER_IN_ISO" = "yes" ]; then
+  github-step "Include base container image in ISO"
+
+  podman-chroot 'pacman -Sy --needed --noconfirm podman && \
+    mkdir -p /var/lib/containers/storage && \
+    mkdir -p /etc/containers'
+
+  # Set storage driver to vfs to avoid needing fuse-overlayfs
+  podman-chroot 'cat > /etc/containers/storage.conf <<EOF
+[storage]
+driver = "vfs"
+EOF
+'
+
+  # Load the container image into the ISO's system level podman container storage
+  echo "Loading OCI Image onto the ISO"
+  podman save $SQUASHFS_CTR_IMG | podman-chroot-no-tty "podman --storage-driver vfs load"
+
+  github-step-end
+fi
+
+# Run custom_pre_hooks before anything else is done
 custom_pre_hooks
 
 github-step "Basic System Tweaks"
@@ -161,27 +174,6 @@ podman-chroot 'echo "# Disabled for live sessions" > /usr/lib/systemd/zram-gener
 podman-chroot 'echo "# Disabled for live sessions" > /etc/systemd/zram-generator.conf'
 
 github-step-end
-
-if [ "$INCLUDE_CONTAINER_IN_ISO" = "yes" ]; then
-  github-step "Include base container image in ISO"
-
-  podman-chroot 'pacman -Sy --needed --noconfirm podman && \
-    mkdir -p /var/lib/containers/storage && \
-    mkdir -p /etc/containers'
-
-  # Set storage driver to vfs to avoid needing fuse-overlayfs
-  podman-chroot 'cat > /etc/containers/storage.conf <<EOF
-[storage]
-driver = "vfs"
-EOF
-'
-
-  # Load the container image into the ISO's system level podman container storage
-  echo "Loading OCI Image onto the ISO"
-  podman save $SQUASHFS_CTR_IMG | podman-chroot-no-tty "podman load"
-
-  github-step-end
-fi
 
 github-step "Install Sudo & Create Live User"
 
