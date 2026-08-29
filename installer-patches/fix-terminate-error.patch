@@ -1,0 +1,32 @@
+diff --git a/bootc_installer/views/progress.py b/bootc_installer/views/progress.py
+index 78949695..8d21650e 100644
+--- a/bootc_installer/views/progress.py
++++ b/bootc_installer/views/progress.py
+@@ -701,7 +701,6 @@ class BootcProgress(Gtk.Box):
+         This sends SIGTERM to the bash wrapper process group. fisherman's cleanup
+         handler will attempt to unmount filesystems and close LUKS devices.
+         """
+-        self.__stop_carousel_timer()
+         self.__cancel_video_fallback_timeout()
+         if self.__proc is None:
+             return
+diff --git a/tests/ui/test_confirm_progress.py b/tests/ui/test_confirm_progress.py
+index 8818c79a..9d7dfa7d 100644
+--- a/tests/ui/test_confirm_progress.py
++++ b/tests/ui/test_confirm_progress.py
+@@ -112,6 +112,15 @@ class TestProgressScreen:
+             _pump()
+         return progress, window
+ 
++    def test_terminate_does_not_raise_when_no_process_running(self):
++        """Regression test: terminate() used to call the long-removed
++        __stop_carousel_timer (deleted with the soundtrack/track-carousel
++        feature), raising AttributeError whenever the window was closed
++        before or during an install. See terminate()'s call to
++        __cancel_video_fallback_timeout for the surviving cleanup step."""
++        progress, _window = self._make_progress()
++        progress.terminate()
++
+     def test_media_and_console_toggles_preserve_selected_media_mode(self):
+         progress, _window = self._make_progress()
+ 

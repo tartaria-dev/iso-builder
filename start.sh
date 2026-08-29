@@ -81,9 +81,8 @@ function custom_pre_hooks(){
 
   # configure liveuser
   podman-chroot 'sed -i "/vt = 1/a \\\n[initial_session]\ncommand = \"niri-session\"\nuser = \"liveuser\"" /etc/greetd/config.toml'
-  podman-chroot 'for f in /etc/pam.d/greetd /etc/pam.d/login /etc/pam.d/system-login; do [ -f "$f" ] && sed -i "/pam_gnome_keyring\.so/d" "$f"; done; mkdir -p /etc/systemd/user; for u in gnome-keyring-daemon.service gnome-keyring-daemon.socket; do ln -sf /dev/null "/etc/systemd/user/$u"; done; for f in gnome-keyring-pkcs11 gnome-keyring-secrets gnome-keyring-ssh; do rm -f "/etc/xdg/autostart/$f.desktop"; done'
   podman-chroot "echo 'polkit.addRule(function(action, subject) { if (subject.user == \"liveuser\") { return polkit.Result.YES; } });' | tee /etc/polkit-1/rules.d/49-liveuser.rules > /dev/null"
-  podman-chroot "sed -i '1i spawn-sh-at-startup \"bootc-installer\"' /usr/share/tartaria/cherries/dot_config/niri/config.kdl && touch /usr/share/tartaria/cherries/dot_local/state/noctalia/.setup-complete"
+  podman-chroot "sed -i '1i spawn-sh-at-startup \"bootc-installer\"' /usr/share/tartaria/cherries/dot_config/niri/config.kdl"
 
   # create temp build user
   podman-chroot 'useradd -U builder'
@@ -103,7 +102,7 @@ function custom_pre_hooks(){
   podman-chroot 'mkdir -p /etc/bootc-installer'
 
   # remove build pkgs
-  podman-chroot 'pacman -Rns --noconfirm ninja meson blueprint-compiler'
+  podman-chroot 'pacman -Rns --noconfirm ninja meson blueprint-compiler gnome-keyring'
 
   # remove unecessary files
   podman-chroot 'rm -rf /usr/lib/subsystem/rootfs/rootfs.dsk /usr/lib/flatpak-sysapps/flatpak-sysapps.dsk'
