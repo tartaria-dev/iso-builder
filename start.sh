@@ -128,28 +128,7 @@ function custom_post_hooks(){
   github-step-end
 }
 
-if [ "$INCLUDE_CONTAINER_IN_ISO" = "yes" ]; then
-  github-step "Include base container image in ISO"
-
-  podman-chroot 'pacman -Sy --needed --noconfirm podman && \
-    mkdir -p /var/lib/containers/storage && \
-    mkdir -p /etc/containers'
-
-  # Set storage driver to vfs to avoid needing fuse-overlayfs
-  podman-chroot 'cat > /etc/containers/storage.conf <<EOF
-[storage]
-driver = "vfs"
-EOF
-'
-
-  # Load the container image into the ISO's system level podman container storage
-  echo "Loading OCI Image onto the ISO"
-  podman save $SQUASHFS_CTR_IMG | podman-chroot-no-tty "podman --storage-driver vfs load"
-
-  github-step-end
-fi
-
-# Run custom_pre_hooks before anything else is done
+# Run custom_pre_hooks before anything is done
 custom_pre_hooks
 
 github-step "Basic System Tweaks"
@@ -174,6 +153,27 @@ podman-chroot 'echo "# Disabled for live sessions" > /usr/lib/systemd/zram-gener
 podman-chroot 'echo "# Disabled for live sessions" > /etc/systemd/zram-generator.conf'
 
 github-step-end
+
+if [ "$INCLUDE_CONTAINER_IN_ISO" = "yes" ]; then
+  github-step "Include base container image in ISO"
+
+  podman-chroot 'pacman -Sy --needed --noconfirm podman && \
+    mkdir -p /var/lib/containers/storage && \
+    mkdir -p /etc/containers'
+
+  # Set storage driver to vfs to avoid needing fuse-overlayfs
+  podman-chroot 'cat > /etc/containers/storage.conf <<EOF
+[storage]
+driver = "vfs"
+EOF
+'
+
+  # Load the container image into the ISO's system level podman container storage
+  echo "Loading OCI Image onto the ISO"
+  podman save $SQUASHFS_CTR_IMG | podman-chroot-no-tty "podman --storage-driver vfs load"
+
+  github-step-end
+fi
 
 github-step "Install Sudo & Create Live User"
 
