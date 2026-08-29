@@ -80,9 +80,10 @@ function custom_pre_hooks(){
   github-step "Custom Pre Hooks"
 
   # configure liveuser
-  podman-chroot 'sed -i "/vt = 1/a \\[initial_session]\ncommand = \"niri-session\"\nuser = \"liveuser\"\n" /etc/greetd/config.toml'
+  podman-chroot 'sed -i "/vt = 1/a \\\n[initial_session]\ncommand = \"niri-session\"\nuser = \"liveuser\"" /etc/greetd/config.toml'
+  podman-chroot 'for f in /etc/pam.d/greetd /etc/pam.d/login /etc/pam.d/system-login; do [ -f "$f" ] && sed -i "/pam_gnome_keyring\.so/d" "$f"; done; mkdir -p /etc/systemd/user; for u in gnome-keyring-daemon.service gnome-keyring-daemon.socket; do ln -sf /dev/null "/etc/systemd/user/$u"; done; for f in gnome-keyring-pkcs11 gnome-keyring-secrets gnome-keyring-ssh; do rm -f "/etc/xdg/autostart/$f.desktop"; done'
   podman-chroot "echo 'polkit.addRule(function(action, subject) { if (subject.user == \"liveuser\") { return polkit.Result.YES; } });' | tee /etc/polkit-1/rules.d/49-liveuser.rules > /dev/null"
-  podman-chroot "sed -i '1i spawn-sh-at-startup \"bootc-installer\"' /usr/share/tartaria/cherries/dot_config/niri/config.kdl"
+  podman-chroot "sed -i '1i spawn-sh-at-startup \"bootc-installer\"' /usr/share/tartaria/cherries/dot_config/niri/config.kdl && touch /usr/share/tartaria/cherries/dot_local/state/noctalia/.setup-complete"
 
   # create temp build user
   podman-chroot 'useradd -U builder'
@@ -94,7 +95,7 @@ function custom_pre_hooks(){
   
   # clone bootc-installer and install it
   podman-chroot 'su builder -c "git clone --recurse-submodules -b v3.0.16 --depth 1 https://github.com/projectbluefin/bootc-installer /buildhome/bootc-installer" >/dev/null'
-  podman-chroot 'su builder -c "cd /buildhome/bootc-installer && git apply /app/installer-patches/disable-custom-image-field.patch && git apply /app/installer-patches/fix-distro-branding.patch" >/dev/null'
+  podman-chroot 'su builder -c "cd /buildhome/bootc-installer && for patch in /app/installer-patches; do git apply $patch; done" >/dev/null'
   podman-chroot 'su builder -c "cd /buildhome/bootc-installer && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
   podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
 
