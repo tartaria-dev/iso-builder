@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 
 _SCRIPTDIR=$(dirname "$0")
-[ -f $_SCRIPTDIR/config.sh ] && source $_SCRIPTDIR/config.sh
 SQUASHFS_CTR_IMG=${1:-$SQUASHFS_CTR_IMG}
 OUT_DIR=${2:-./out}
 ISO_NAME=${3:-${ISO_NAME:-tartaria}}
@@ -75,62 +74,55 @@ function podman-chroot-no-tty(){
     /usr/bin/bash -c "$command"
 }
 
-function custom_pre_hooks(){
-  set -euo pipefail
-  github-step "Custom Pre Hooks"
+github-step "System Setup"
 
-  # configure liveuser
-  podman-chroot 'sed -i "/vt = 1/a \\\n[initial_session]\ncommand = \"niri-session\"\nuser = \"liveuser\"" /etc/greetd/config.toml'
-  podman-chroot "echo 'polkit.addRule(function(action, subject) { if (subject.user == \"liveuser\") { return polkit.Result.YES; } });' | tee /etc/polkit-1/rules.d/49-liveuser.rules > /dev/null"
-  podman-chroot "sed -i '1i spawn-sh-at-startup \"bootc-installer\"' /usr/share/tartaria/cherries/dot_config/niri/config.kdl"
+# configure liveuser
+podman-chroot 'sed -i "/vt = 1/a \\\n[initial_session]\ncommand = \"niri-session\"\nuser = \"liveuser\"" /etc/greetd/config.toml'
+podman-chroot "echo 'polkit.addRule(function(action, subject) { if (subject.user == \"liveuser\") { return polkit.Result.YES; } });' | tee /etc/polkit-1/rules.d/49-liveuser.rules > /dev/null"
+podman-chroot "sed -i '1i spawn-sh-at-startup \"bootc-installer\"' /usr/share/tartaria/cherries/dot_config/niri/config.kdl"
 
-  # create temp build user
-  podman-chroot 'useradd -U builder'
-  podman-chroot 'mkdir -p /etc/sudoers.d /buildhome && echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder'
-  podman-chroot 'chown builder:builder /buildhome'
+# create temp build user
+podman-chroot 'useradd -U builder'
+podman-chroot 'mkdir -p /etc/sudoers.d /buildhome && echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder'
+podman-chroot 'chown builder:builder /buildhome'
 
-  # install necessary build pkgs
-  podman-chroot 'pacman -S --noconfirm --needed ninja meson blueprint-compiler mutter >/dev/null'
-  
-  # clone bootc-installer and install it
-  podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules -b v3.0.16 --depth 1 https://github.com/projectbluefin/bootc-installer /buildhome/bootc-installer"'
-  podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && for patch in /app/installer-patches/*.patch; do git apply \"\$patch\"; done"'
-  podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
-  podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
+# install build pkgs
+podman-chroot 'pacman -S --noconfirm --needed ninja meson blueprint-compiler mutter go >/dev/null'
 
-  # create bootc-installer conf dir
-  podman-chroot 'mkdir -p /etc/bootc-installer'
+# clone bootc-installer and install it
+podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules -b v3.0.16 --depth 1 https://github.com/projectbluefin/bootc-installer /buildhome/bootc-installer"'
+podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && for patch in /app/installer-patches/*.patch; do git apply \"\$patch\"; done"'
+podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
 
-  # remove build pkgs
-  podman-chroot 'pacman -Rns --noconfirm ninja meson blueprint-compiler gnome-keyring'
+# clone fisherman and install it to /usr/local/bin/fisherman
+podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --depth 1 -b v0.2.1 https://github.com/projectbluefin/fisherman /buildhome/fisherman"'
+podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman && GOCACHE=/buildhome/gocache GOPATH=/buildhome/gopath GOPROXY=off go build -o /buildhome/fisherman/fisherman-bin ./cmd/fisherman && sudo install -Dm755 /buildhome/fisherman/fisherman-bin /usr/local/bin/fisherman"'
 
-  # remove unecessary files
-  podman-chroot 'rm -rf /usr/lib/subsystem/rootfs/rootfs.dsk /usr/lib/flatpak-sysapps/flatpak-sysapps.dsk'
+# cleanup
+podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
+podman-chroot 'pacman -Rns --noconfirm ninja meson blueprint-compiler go'
 
-  # add installer recipe
-  case "$ISO_NAME" in
-    *arch*)
-        podman-chroot 'cp /app/installer-recipes/arch /etc/bootc-installer/recipe.json'
-        ;;
-    *cachy*)
-        podman-chroot 'cp /app/installer-recipes/cachy /etc/bootc-installer/recipe.json'
-        ;;
-  esac
+# install/remove some pkgs
+podman-chroot 'pacman -S --noconfirm --needed firefox'
+podman-chroot 'pacman -Rns --noconfirm gnome-keyring'
 
-  github-step-end
-}
+# create bootc-installer conf dir
+podman-chroot 'mkdir -p /etc/bootc-installer'
 
-function custom_post_hooks(){
-  set -euo pipefail
-  github-step "Custom Post Hooks"
+# remove unecessary files
+podman-chroot 'rm -rf /usr/lib/subsystem/rootfs/rootfs.dsk /usr/lib/flatpak-sysapps/flatpak-sysapps.dsk'
 
-  github-step-end
-}
-
-# Run custom_pre_hooks before anything is done
-custom_pre_hooks
-
-github-step "Basic System Tweaks"
+# add installer recipe
+case "$ISO_NAME" in
+  *arch*)
+      podman-chroot 'cp /app/installer-recipes/arch /etc/bootc-installer/recipe.json'
+      podman-chroot 'cp /app/installer-recipes/arch-images /etc/bootc-installer/images.json'
+      ;;
+  *cachy*)
+      podman-chroot 'cp /app/installer-recipes/cachy /etc/bootc-installer/recipe.json'
+      podman-chroot 'cp /app/installer-recipes/cachy-images /etc/bootc-installer/images.json'
+      ;;
+esac
 
 # Add contents from skel to /etc/skel
 rsync -rltDxv $_SCRIPTDIR/skel/ $SQUASHFS_CTR_IMAGE_MOUNTPOINT/etc/skel/
@@ -153,28 +145,7 @@ podman-chroot 'echo "# Disabled for live sessions" > /etc/systemd/zram-generator
 
 github-step-end
 
-if [ "$INCLUDE_CONTAINER_IN_ISO" = "yes" ]; then
-  github-step "Include base container image in ISO"
-
-  podman-chroot 'pacman -Sy --needed --noconfirm podman && \
-    mkdir -p /var/lib/containers/storage && \
-    mkdir -p /etc/containers'
-
-  # Set storage driver to vfs to avoid needing fuse-overlayfs
-  podman-chroot 'cat > /etc/containers/storage.conf <<EOF
-[storage]
-driver = "vfs"
-EOF
-'
-
-  # Load the container image into the ISO's system level podman container storage
-  echo "Loading OCI Image onto the ISO"
-  podman save $SQUASHFS_CTR_IMG | podman-chroot-no-tty "podman --storage-driver vfs load"
-
-  github-step-end
-fi
-
-github-step "Install Sudo & Create Live User"
+github-step "Create Live User"
 
 ## Create liveuser & its home directory. Also install sudo and give liveuser sudo abilities
 podman-chroot "pacman -Sy --needed --noconfirm sudo && \
@@ -205,7 +176,7 @@ podman-chroot "systemctl enable liveuser-homedir.service"
 
 github-step-end
 
-github-step "Build liveiso's initramfs with dracut"
+github-step "Build initramfs"
 
 # Build an initramfs for the resulting ISO to use. We will need dracut.
 # Your image should have a kernel inside of it. If it doesn't, you will need to install one using custom_pre_hooks. 

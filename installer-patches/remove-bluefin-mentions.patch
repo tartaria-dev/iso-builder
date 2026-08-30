@@ -1,25 +1,3 @@
-diff --git a/bootc_installer/defaults/welcome.py b/bootc_installer/defaults/welcome.py
-index 3501a408..84eb7826 100644
---- a/bootc_installer/defaults/welcome.py
-+++ b/bootc_installer/defaults/welcome.py
-@@ -95,6 +95,17 @@ class BootcDefaultWelcome(Adw.Bin):
-         if welcome_subtitle:
-             self.page_header.subtitle = welcome_subtitle
- 
-+        # The install button defaults to a hardcoded "Install Bluefin" in
-+        # the template. Override it from the recipe's distro_name so other
-+        # distros don't ship Bluefin-branded button text. An explicit
-+        # install_button_title always wins if the recipe sets one.
-+        distro_name = self.__distro_info.get("distro_name", "")
-+        install_title = self.__distro_info.get("install_button_title") or (
-+            f"Install {distro_name}" if distro_name else None
-+        )
-+        if install_title:
-+            self.row_install.set_title(install_title)
-+
-         try:
-             self.row_bluetooth.set_visible(_needs_bluetooth_pairing())
-         except Exception:
 diff --git a/bootc_installer/gtk/default-welcome.blp b/bootc_installer/gtk/default-welcome.blp
 index d76674f1..d74fbd3b 100644
 --- a/bootc_installer/gtk/default-welcome.blp
@@ -29,8 +7,9 @@ index d76674f1..d74fbd3b 100644
        Adw.PreferencesGroup {
          Adw.ActionRow row_install {
 -          title: _("Install Bluefin");
-+          title: _("Install");
-           subtitle: _("Installs to your internal disk. Takes about 5–10 minutes.");
+-          subtitle: _("Installs to your internal disk. Takes about 5–10 minutes.");
++          title: _("Install Tartaria");
++          subtitle: _("Installs to your internal disk. Takes about 5–10 minutes, depending on internet speed.");
            icon-name: "folder-download-symbolic";
            activatable: true;
 diff --git a/bootc_installer/utils/progress_parser.py b/bootc_installer/utils/progress_parser.py

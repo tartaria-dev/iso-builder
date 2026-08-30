@@ -1,0 +1,38 @@
+{
+  "default_image": "ghcr.io/tartaria-dev/tartaria:stable-cachy-berbere",
+  "fallback_flatpaks": [],
+  "images": [
+    {
+      "name": "Tartaria (Berbere)",
+      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-cachy-berbere",
+      "bootloader": "grub2",
+      "filesystem": "btrfs",
+      "composefs": false,
+      "needs_user_creation": true
+    },
+    {
+      "name": "Tartaria (Amchoor)",
+      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-cachy-amchoor",
+      "bootloader": "grub2",
+      "filesystem": "btrfs",
+      "composefs": false,
+      "needs_user_creation": true
+    },
+    {
+      "name": "Tartaria (Mahleb)",
+      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-cachy-mahleb",
+      "bootloader": "systemd",
+      "filesystem": "btrfs",
+      "composefs": true,
+      "needs_user_creation": true
+    },
+    {
+      "name": "Tartaria (Saffron)",
+      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-cachy-saffron",
+      "bootloader": "systemd",
+      "filesystem": "btrfs",
+      "composefs": true,
+      "needs_user_creation": true
+    }
+  ]
+}

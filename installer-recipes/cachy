@@ -3,46 +3,10 @@
   "distro_name": "Tartaria",
   "distro_logo": "/usr/share/pixmaps/tartaria-logo.svg",
   "hostname": "tartarbox",
-  "allow_custom_image": false,
   "selinuxDisabled": false,
   "unifiedStorage": true,
   "distroID": "tartaria",
   "brewTap": "ublue-os/tap",
-
-  "images": [
-    {
-      "name": "Tartaria (Berbere)",
-      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-cachy-bebere",
-      "bootloader": "grub2",
-      "filesystem": "btrfs",
-      "composefs": false,
-      "needs_user_creation": true
-    },
-    {
-      "name": "Tartaria (Amchoor)",
-      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-cachy-amchoor",
-      "bootloader": "grub2",
-      "filesystem": "btrfs",
-      "composefs": false,
-      "needs_user_creation": true
-    },
-    {
-      "name": "Tartaria (Mahleb)",
-      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-cachy-mahleb",
-      "bootloader": "systemd",
-      "filesystem": "btrfs",
-      "composefs": true,
-      "needs_user_creation": true
-    },
-    {
-      "name": "Tartaria (Saffron)",
-      "imgref": "ghcr.io/tartaria-dev/tartaria:stable-cachy-saffron",
-      "bootloader": "systemd",
-      "filesystem": "btrfs",
-      "composefs": true,
-      "needs_user_creation": true
-    }
-  ],
 
   "welcome_title": "Welcome to Tartaria!",
   "welcome_subtitle": "A fancy Arch/CachyOSv3 based bootc image that stays out of your way.",
