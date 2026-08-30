@@ -90,7 +90,7 @@ podman-chroot 'pacman -S --noconfirm --needed ninja meson blueprint-compiler mut
 
 # clone bootc-installer and install it
 podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules -b v3.0.16 --depth 1 https://github.com/projectbluefin/bootc-installer /buildhome/bootc-installer"'
-podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && for patch in /app/installer-patches/*.patch; do git apply \"\$patch\"; done"'
+podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && for patch in /app/installer-patches/*.patch; do git apply \"\$patch\" || exit 1; done"'
 podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
 
 # clone fisherman and install it to /usr/local/bin/fisherman

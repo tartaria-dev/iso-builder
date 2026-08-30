@@ -101,7 +101,7 @@ index 893eef76..532db809 100644
              icon-name: "media-optical-symbolic";
              title: _("Choose an Image");
 -            subtitle: _("Select a BootcOS image to install, or enter a custom bootc-compatible image URL.");
-+            subtitle: _("Select a BootcOS image to install.");
++            subtitle: _("Select a Tartaria spice to install.");
            }
          }
  
@@ -134,19 +134,16 @@ diff --git a/bootc_installer/utils/processor.py b/bootc_installer/utils/processo
 index 21b7a634..a302bdd3 100644
 --- a/bootc_installer/utils/processor.py
 +++ b/bootc_installer/utils/processor.py
-@@ -136,10 +136,10 @@ class Processor:
+@@ -136,7 +136,7 @@ class Processor:
                      encryption_type = "tpm2-luks"
  
          # --- Image / OCI ref ---
--        # In Flatpak mode: finals contain "selected_image" or "custom_image" from the UI.
-+        # In Flatpak mode: finals contain "selected_image" from the UI.
-         # In live ISO mode: the image step is skipped; recipe["imgref"] holds the remote
-         # tracking ref and optional "local_imgref" holds the install source override.
+-        # finals contain "selected_image" or "custom_image" from the UI.
 -        image = merged.get("custom_image", "") or merged.get("selected_image", "")
++        # finals contain "selected_image" from the UI.
 +        image = merged.get("selected_image", "")
          if not image:
              image = sys_recipe.get("imgref", "")
-         if not image:
 diff --git a/bootc_installer/views/confirm.py b/bootc_installer/views/confirm.py
 index 2425ebfd..4a9c9619 100644
 --- a/bootc_installer/views/confirm.py

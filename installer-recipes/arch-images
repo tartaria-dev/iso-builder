@@ -3,32 +3,36 @@
   "fallback_flatpaks": [],
   "images": [
     {
-      "name": "Tartaria (Berbere)",
+      "name": "Tartaria (Arch-Berbere)",
       "imgref": "ghcr.io/tartaria-dev/tartaria:stable-arch-berbere",
+      "desc": "Stable Arch-based image with the standard grub2 bootloader, the recommended default.",
       "bootloader": "grub2",
       "filesystem": "btrfs",
       "composefs": false,
       "needs_user_creation": true
     },
     {
-      "name": "Tartaria (Amchoor)",
+      "name": "Tartaria (Arch-Amchoor)",
       "imgref": "ghcr.io/tartaria-dev/tartaria:stable-arch-amchoor",
+      "desc": "Stable Arch-based image with the standard grub2 bootloader and preinstalled NVIDIA drivers.",
       "bootloader": "grub2",
       "filesystem": "btrfs",
       "composefs": false,
       "needs_user_creation": true
     },
     {
-      "name": "Tartaria (Mahleb)",
+      "name": "Tartaria (Arch-Mahleb)",
       "imgref": "ghcr.io/tartaria-dev/tartaria:stable-arch-mahleb",
+      "desc": "Experimental Arch-based image with the systemd bootloader and sealed image layout.",
       "bootloader": "systemd",
       "filesystem": "btrfs",
       "composefs": true,
       "needs_user_creation": true
     },
     {
-      "name": "Tartaria (Saffron)",
+      "name": "Tartaria (Arch-Saffron)",
       "imgref": "ghcr.io/tartaria-dev/tartaria:stable-arch-saffron",
+      "desc": "Experimental Arch-based image with the systemd bootloader, sealed image layout, and preinstalled NVIDIA drivers.",
       "bootloader": "systemd",
       "filesystem": "btrfs",
       "composefs": true,
