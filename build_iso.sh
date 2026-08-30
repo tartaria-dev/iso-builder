@@ -5,7 +5,6 @@ if [ "$ISO_ENVIRONMENT" != true ]; then
   exit 1
 fi
 
-PS4='[$LINENO]+ '
 set -x
 shopt -s nullglob
 
@@ -26,7 +25,7 @@ dnf install --setopt=install_weak_deps=False -yq \
     xorriso \
     mtools \
     dosfstools \
-    squashfs-tools
+    squashfs-tools >/dev/null
 
 # Remove fallback efi
 cp /boot/efi/EFI/fedora/grubx64.efi /boot/efi/EFI/BOOT/fbx64.efi # NOTE: remove this line if breaks bootloader

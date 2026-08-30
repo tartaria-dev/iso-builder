@@ -16,7 +16,7 @@ elif ! which podman rsync &>/dev/null; then
   exit 1
 fi
 
-set -euo pipefail
+set -ouex pipefail
 
 # debugging
 # set -x
