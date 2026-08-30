@@ -18,10 +18,6 @@ fi
 
 set -ouex pipefail
 
-# debugging
-# set -x
-PS4='[$LINENO]+ '
-
 # These 2 functions help group sections in github's CI
 function github-step() {
   set -euo pipefail
@@ -43,7 +39,7 @@ podman image exists "${SQUASHFS_CTR_IMG}" || podman pull "${SQUASHFS_CTR_IMG}" |
 
 # Create container from image and mount it to modify its rootfs non-destructively
 CONTAINER_ID=$(podman create "${SQUASHFS_CTR_IMG}")
-  trap "echo -e 'Cleaning up podman images\n' && podman rm -f ${CONTAINER_ID}" EXIT
+trap "echo -e 'Cleaning up podman images\n' && podman rm -f ${CONTAINER_ID}" EXIT
 SQUASHFS_CTR_IMAGE_MOUNTPOINT=$(podman mount ${CONTAINER_ID})
 
 # podman-chroot function to run commands within the OCI
@@ -76,6 +72,9 @@ function podman-chroot-no-tty(){
 
 github-step "System Setup"
 
+# remove usrlocal symlink
+rm -f $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/local
+
 # configure liveuser
 podman-chroot 'sed -i "/vt = 1/a \\\n[initial_session]\ncommand = \"niri-session\"\nuser = \"liveuser\"" /etc/greetd/config.toml'
 podman-chroot "echo 'polkit.addRule(function(action, subject) { if (subject.user == \"liveuser\") { return polkit.Result.YES; } });' | tee /etc/polkit-1/rules.d/49-liveuser.rules > /dev/null"
@@ -96,7 +95,7 @@ podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && m
 
 # clone fisherman and install it to /usr/local/bin/fisherman
 podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --depth 1 -b v0.2.1 https://github.com/projectbluefin/fisherman /buildhome/fisherman"'
-podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman && GOCACHE=/buildhome/gocache GOPATH=/buildhome/gopath GOPROXY=off go build -o /buildhome/fisherman/fisherman-bin ./cmd/fisherman && rm -f /usr/local && sudo install -Dm755 /buildhome/fisherman/fisherman-bin /usr/bin/fisherman"'
+podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman && GOCACHE=/buildhome/gocache GOPATH=/buildhome/gopath GOPROXY=off go build -o /buildhome/fisherman/fisherman-bin ./cmd/fisherman && sudo install -Dm755 /buildhome/fisherman/fisherman-bin /usr/bin/fisherman"'
 
 # cleanup
 podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
