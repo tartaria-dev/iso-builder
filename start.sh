@@ -73,7 +73,7 @@ function podman-chroot-no-tty(){
 github-step "System Setup"
 
 # remove usrlocal symlink
-rm -f $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/local
+sudo rm -f $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/local
 
 # configure liveuser
 podman-chroot 'sed -i "/vt = 1/a \\\n[initial_session]\ncommand = \"niri-session\"\nuser = \"liveuser\"" /etc/greetd/config.toml'
