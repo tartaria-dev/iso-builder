@@ -96,7 +96,7 @@ podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && m
 
 # clone fisherman and install it to /usr/local/bin/fisherman
 podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --depth 1 -b v0.2.1 https://github.com/projectbluefin/fisherman /buildhome/fisherman"'
-podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman && GOCACHE=/buildhome/gocache GOPATH=/buildhome/gopath GOPROXY=off go build -o /buildhome/fisherman/fisherman-bin ./cmd/fisherman && sudo install -Dm755 /buildhome/fisherman/fisherman-bin /usr/local/bin/fisherman"'
+podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman && GOCACHE=/buildhome/gocache GOPATH=/buildhome/gopath GOPROXY=off go build -o /buildhome/fisherman/fisherman-bin ./cmd/fisherman && rm -f /usr/local && sudo install -Dm755 /buildhome/fisherman/fisherman-bin /usr/bin/fisherman"'
 
 # cleanup
 podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
@@ -129,15 +129,12 @@ rsync -rltDxv $_SCRIPTDIR/skel/ $SQUASHFS_CTR_IMAGE_MOUNTPOINT/etc/skel/
 
 # We create a /var/tmp directory that ISN'T a tmpfs, and we set podman's storage driver to vfs.
 # We also set the timezone to UTC, and remove a possible existing /etc/machine-id to prevent any weirdness with systemd-firstboot.
-podman-chroot 'ln -sf /usr/share/zoneinfo/UTC /etc/localtime && \
-  [ -d /var/tmp ] || mkdir -p /var/tmp'
+podman-chroot 'ln -sf /usr/share/zoneinfo/UTC /etc/localtime && mkdir -p /var/tmp'
 
-# Create tmpfiles.d entry for systemd-resolved, and enable it. 
+# Create tmpfiles.d entry for systemd-resolved and enable it. 
 # We will remove /etc/resolv.conf in build_iso.sh, as if we try to do so here, it won't let us. Podman currently manages /etc/resolv.conf through a mountpoint.
 podman-chroot 'systemctl enable systemd-resolved.service'
-podman-chroot 'cat > /usr/lib/tmpfiles.d/resolved.conf <<EOF
-L /etc/resolv.conf - - - - ../run/systemd/resolve/stub-resolv.conf
-EOF'
+podman-chroot 'echo "L /etc/resolv.conf - - - - ../run/systemd/resolve/stub-resolv.conf" | tee /usr/lib/tmpfiles.d/resolved.conf'
 
 # Disable zram-generator as zram breaks hard under an ISO environment
 podman-chroot 'echo "# Disabled for live sessions" > /usr/lib/systemd/zram-generator.conf'
