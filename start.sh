@@ -201,9 +201,6 @@ podman-chroot "rm -rf /var/tmp/*"
 
 github-step-end
 
-# Run custom_post_hooks after everything is ran
-custom_post_hooks
-
 # Build the iso
 [ -d "$OUT_DIR" ] || mkdir -p "$OUT_DIR" && \
 podman run \
