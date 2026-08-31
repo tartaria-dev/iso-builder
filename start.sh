@@ -72,9 +72,6 @@ function podman-chroot-no-tty(){
 
 github-step "System Setup"
 
-# remove usrlocal symlink
-sudo rm -f $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/local
-
 # configure liveuser
 podman-chroot 'sed -i "/vt = 1/a \\\n[initial_session]\ncommand = \"niri-session\"\nuser = \"liveuser\"" /etc/greetd/config.toml'
 podman-chroot "echo 'polkit.addRule(function(action, subject) { if (subject.user == \"liveuser\") { return polkit.Result.YES; } });' | tee /etc/polkit-1/rules.d/49-liveuser.rules > /dev/null"
@@ -88,6 +85,10 @@ podman-chroot 'chown builder:builder /buildhome'
 # install build pkgs
 podman-chroot 'pacman -S --noconfirm --needed ninja meson blueprint-compiler mutter go >/dev/null'
 
+# remove usrlocal symlink, replace with dir
+sudo rm -f $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/local
+sudo mkdir -p $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/local/bin
+
 # clone bootc-installer and install it
 podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules -b v3.0.16 --depth 1 https://github.com/projectbluefin/bootc-installer /buildhome/bootc-installer"'
 podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && for patch in /app/installer-patches/*.patch; do git apply \"\$patch\" || exit 1; done"'
@@ -95,15 +96,15 @@ podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && m
 
 # clone fisherman and install it to /usr/local/bin/fisherman
 podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --depth 1 -b v0.2.1 https://github.com/projectbluefin/fisherman /buildhome/fisherman"'
-podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman && GOCACHE=/buildhome/gocache GOPATH=/buildhome/gopath GOPROXY=off go build -o /buildhome/fisherman/fisherman-bin ./cmd/fisherman && sudo install -Dm755 /buildhome/fisherman/fisherman-bin /usr/bin/fisherman"'
+podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman && GOCACHE=/buildhome/gocache GOPATH=/buildhome/gopath GOPROXY=off go build -o /buildhome/fisherman/fisherman-bin ./cmd/fisherman && sudo install -Dm755 /buildhome/fisherman/fisherman-bin /usr/local/bin/fisherman"'
 
 # cleanup
 podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
 podman-chroot 'pacman -Rns --noconfirm ninja meson blueprint-compiler go'
 
 # install/remove some pkgs
+podman-chroot 'pacman -Rns --noconfirm gnome-keyring dotnet-runtime dotnet-sdk base-devel gcc binutils mkosi sysprof docker docker-buildx docker-compose flatpak cups cups-browsed hplip samba smbclient evolution-data-server tuned tuned-ppd ddcutil iio-sensor-proxy fprintd gpu-screen-recorder ttf-arphic-uming ttf-baekmuk wqy-microhei ttf-croscore ttf-droid gnu-free-fonts gsfonts powertop libva-intel-driver ffmpegthumbs'
 podman-chroot 'pacman -S --noconfirm --needed firefox'
-podman-chroot 'pacman -Rns --noconfirm gnome-keyring'
 
 # create bootc-installer conf dir
 podman-chroot 'mkdir -p /etc/bootc-installer'
@@ -112,16 +113,8 @@ podman-chroot 'mkdir -p /etc/bootc-installer'
 podman-chroot 'rm -rf /usr/lib/subsystem/rootfs/rootfs.dsk /usr/lib/flatpak-sysapps/flatpak-sysapps.dsk'
 
 # add installer recipe
-case "$ISO_NAME" in
-  *arch*)
-      podman-chroot 'cp /app/installer-recipes/arch /etc/bootc-installer/recipe.json'
-      podman-chroot 'cp /app/installer-recipes/arch-images /etc/bootc-installer/images.json'
-      ;;
-  *cachy*)
-      podman-chroot 'cp /app/installer-recipes/cachy /etc/bootc-installer/recipe.json'
-      podman-chroot 'cp /app/installer-recipes/cachy-images /etc/bootc-installer/images.json'
-      ;;
-esac
+podman-chroot 'cp /app/recipe.json /etc/bootc-installer/recipe.json'
+podman-chroot "sed -i 's/PLACEHOLDER/${ISO_NAME#*-}/g' /etc/bootc-installer/recipe.json"
 
 # Add contents from skel to /etc/skel
 rsync -rltDxv $_SCRIPTDIR/skel/ $SQUASHFS_CTR_IMAGE_MOUNTPOINT/etc/skel/
@@ -138,6 +131,21 @@ podman-chroot 'echo "L /etc/resolv.conf - - - - ../run/systemd/resolve/stub-reso
 # Disable zram-generator as zram breaks hard under an ISO environment
 podman-chroot 'echo "# Disabled for live sessions" > /usr/lib/systemd/zram-generator.conf'
 podman-chroot 'echo "# Disabled for live sessions" > /etc/systemd/zram-generator.conf'
+
+github-step-end
+
+github-step "Load image into ISO"
+
+# podman refuses to work with vfs for whatever reason, so fuse-overlayfs it is
+podman-chroot 'cat > /etc/containers/storage.conf <<EOF
+[storage]
+driver = "overlay"
+
+[storage.options.overlay]
+mount_program = "/usr/bin/fuse-overlayfs"
+EOF'
+
+podman save $SQUASHFS_CTR_IMG | podman-chroot-no-tty "podman load"
 
 github-step-end
 
