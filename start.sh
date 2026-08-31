@@ -56,20 +56,6 @@ function podman-chroot(){
     /usr/bin/bash -c "$command"
 }
 
-# Modified podman-chroot function that plays nice when piped into.
-function podman-chroot-no-tty(){
-  set -euo pipefail
-  local command="$1"
-  podman run --rm -i --privileged \
-    --no-hostname --no-hosts \
-    --security-opt label=type:unconfined_t \
-    --tmpfs /tmp:rw \
-    --tmpfs /run:rw \
-    --volume $_SCRIPTDIR:/app \
-    --rootfs $SQUASHFS_CTR_IMAGE_MOUNTPOINT \
-    /usr/bin/bash -c "$command"
-}
-
 github-step "System Setup"
 
 # configure liveuser
@@ -103,7 +89,7 @@ podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
 podman-chroot 'pacman -Rns --noconfirm ninja meson blueprint-compiler go'
 
 # install/remove some pkgs
-podman-chroot 'pacman -Rns --noconfirm gnome-keyring dotnet-runtime dotnet-sdk base-devel gcc binutils mkosi sysprof docker docker-buildx docker-compose flatpak cups cups-browsed hplip samba smbclient evolution-data-server tuned tuned-ppd ddcutil iio-sensor-proxy fprintd gpu-screen-recorder ttf-arphic-uming ttf-baekmuk wqy-microhei ttf-croscore ttf-droid gnu-free-fonts gsfonts powertop libva-intel-driver ffmpegthumbs'
+podman-chroot 'pacman -Rns --noconfirm gnome-keyring dotnet-runtime dotnet-sdk base-devel valent mkosi sysprof docker docker-buildx docker-compose flatpak cups cups-browsed hplip samba smbclient evolution-data-server tuned tuned-ppd ddcutil fprintd gpu-screen-recorder ttf-arphic-uming ttf-baekmuk wqy-microhei ttf-croscore ttf-droid gnu-free-fonts powertop libva-intel-driver ffmpegthumbs bazaar flatseal'
 podman-chroot 'pacman -S --noconfirm --needed firefox fuse-overlayfs'
 
 # create bootc-installer conf dir
@@ -136,6 +122,9 @@ github-step-end
 
 github-step "Load image into ISO"
 
+# original approach from the repo this was forked from is incredibly ineffecient in terms of space
+# so now we have whatever this is
+
 # podman refuses to work with vfs for whatever reason, so fuse-overlayfs it is
 podman-chroot 'cat > /etc/containers/storage.conf <<EOF
 [storage]
@@ -145,7 +134,22 @@ driver = "overlay"
 mount_program = "/usr/bin/fuse-overlayfs"
 EOF'
 
-podman save $SQUASHFS_CTR_IMG | podman-chroot-no-tty "podman load"
+# unmount, commit, remove old base image
+podman unmount ${CONTAINER_ID}
+podman commit ${CONTAINER_ID} iso-base:latest
+podman rm ${CONTAINER_ID}
+podman rmi $SQUASHFS_CTR_IMG
+
+# reset vars
+SQUASHFS_CTR_IMG="iso-base:latest"
+CONTAINER_ID=$(podman create "${SQUASHFS_CTR_IMG}")
+SQUASHFS_CTR_IMAGE_MOUNTPOINT=$(podman mount ${CONTAINER_ID})
+
+# re-arm trap
+trap "echo -e 'Cleaning up podman images\n' && podman rm -f ${CONTAINER_ID}" EXIT
+
+# pull image to ISO
+podman-chroot "podman pull ghcr.io/tartaria-dev/tartaria:${ISO_NAME#*-}"
 
 github-step-end
 
