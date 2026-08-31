@@ -104,7 +104,7 @@ podman-chroot 'pacman -Rns --noconfirm ninja meson blueprint-compiler go'
 
 # install/remove some pkgs
 podman-chroot 'pacman -Rns --noconfirm gnome-keyring dotnet-runtime dotnet-sdk base-devel gcc binutils mkosi sysprof docker docker-buildx docker-compose flatpak cups cups-browsed hplip samba smbclient evolution-data-server tuned tuned-ppd ddcutil iio-sensor-proxy fprintd gpu-screen-recorder ttf-arphic-uming ttf-baekmuk wqy-microhei ttf-croscore ttf-droid gnu-free-fonts gsfonts powertop libva-intel-driver ffmpegthumbs'
-podman-chroot 'pacman -S --noconfirm --needed firefox'
+podman-chroot 'pacman -S --noconfirm --needed firefox fuse-overlayfs'
 
 # create bootc-installer conf dir
 podman-chroot 'mkdir -p /etc/bootc-installer'
