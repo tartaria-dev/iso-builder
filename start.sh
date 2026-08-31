@@ -95,6 +95,9 @@ podman-chroot 'pacman -S --noconfirm --needed firefox fuse-overlayfs'
 # create bootc-installer conf dir
 podman-chroot 'mkdir -p /etc/bootc-installer'
 
+# copy distro logo to icon dir
+podman-chroot 'cp /usr/share/pixmaps/tartaria-text-logo.svg /usr/share/icons/default-icons-grey-dark/apps/scalable/distributor-logo-tartaria.svg'
+
 # remove unecessary files
 podman-chroot 'rm -rf /usr/lib/subsystem/rootfs/rootfs.dsk /usr/lib/flatpak-sysapps/flatpak-sysapps.dsk'
 
