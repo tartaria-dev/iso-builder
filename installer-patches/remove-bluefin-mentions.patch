@@ -9,7 +9,7 @@ index d76674f1..d74fbd3b 100644
 -          title: _("Install Bluefin");
 -          subtitle: _("Installs to your internal disk. Takes about 5–10 minutes.");
 +          title: _("Install Tartaria");
-+          subtitle: _("Installs to your internal disk. Takes about 5–10 minutes, depending on internet speed.");
++          subtitle: _("Installs to your internal disk. Takes about 5–15 minutes.");
            icon-name: "folder-download-symbolic";
            activatable: true;
 diff --git a/bootc_installer/utils/progress_parser.py b/bootc_installer/utils/progress_parser.py
@@ -21,59 +21,7 @@ index f0124226..c3a54902 100644
      "Mounting filesystem":          "Almost ready…",
      "Formatting data disk (/var)":  "Preparing data storage…",
 -    "Installing OS":                "Installing Bluefin…",
-+    "Installing OS":                "Installing {distro}…",
++    "Installing OS":                "Installing Tartaria…",
      "Enrolling TPM2 auto-unlock":   "Setting up auto-unlock…",
      "Copying system Flatpaks":      "Installing your apps…",
      "Configuring installed system": "Configuring your system…",
-@@ -44,7 +44,7 @@ def new_progress_state() -> dict:
-     }
- 
- 
--def apply_progress_event(line: str, state: dict) -> dict | None:
-+def apply_progress_event(line: str, state: dict, distro_name: str = "Bluefin") -> dict | None:
-     """Parse one fisherman log line and return a UI-update dict, or None.
- 
-     Pure function — no GTK, no I/O.  The returned dict has:
-@@ -53,6 +53,7 @@ def apply_progress_event(line: str, state: dict) -> dict | None:
-       "pulse"     — bool; True means switch bar to pulse mode
-       "complete"  — bool; True means install finished
-     ``state`` is mutated in-place to track multi-line context.
-+    ``distro_name`` fills the "{distro}" placeholder in friendly labels.
-     Returns None for non-JSON lines or events that require no UI change.
-     """
-     if not line.startswith("{"):
-@@ -79,6 +82,8 @@ def apply_progress_event(line: str, state: dict) -> dict | None:
-         state["seen_substeps"].clear()
-         state["pulse_active"] = False
-         friendly = _FRIENDLY_STEP_LABELS.get(name, name)
-+        if "{distro}" in friendly:
-+            friendly = friendly.format(distro=distro_name)
-         return {
-             "fraction": cumulative_pct / 100.0,
-             "label": friendly,
-@@ -109,6 +114,8 @@ def apply_progress_event(line: str, state: dict) -> dict | None:
-         label = None
-         if state["current_step"]:
-             friendly = _FRIENDLY_STEP_LABELS.get(state["current_step_name"], state["current_step_name"])
-+            if "{distro}" in friendly:
-+                friendly = friendly.format(distro=distro_name)
-             label = friendly
-         return {"fraction": fraction, "label": label, "pulse": False, "complete": False}
- 
-diff --git a/bootc_installer/views/progress.py b/bootc_installer/views/progress.py
-index 78949695..59d66c85 100644
---- a/bootc_installer/views/progress.py
-+++ b/bootc_installer/views/progress.py
-@@ -556,7 +556,11 @@ class BootcProgress(Gtk.Box):
-         except (json.JSONDecodeError, ValueError):
-             event = {}
- 
--        update = apply_progress_event(line, self.__progress_state)
-+        update = apply_progress_event(
-+            line,
-+            self.__progress_state,
-+            distro_name=self.__window.recipe.get("distro_name", "Bluefin"),
-+        )
-         if event.get("type") == "recovery_key":
-             self.__recovery_key = self.__progress_state.get("recovery_key", "")
-             logger.info("Fisherman reported recovery key")
