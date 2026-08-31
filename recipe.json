@@ -2,11 +2,22 @@
   "log_file": "/tmp/bootc-installer.log",
   "distro_name": "Tartaria",
   "distro_logo": "/usr/share/pixmaps/tartaria-logo.svg",
-  "imgref": "ghcr.io/tartaria-dev/tartaria:PLACEHOLDER",
+  "imgref": "ghcr.io/tartaria-dev/tartaria:TAG",
   "hostname": "tartarbox",
   "selinuxDisabled": false,
   "unifiedStorage": true,
   "distroID": "tartaria",
+
+  "images": [
+    {
+      "name": "Tartaria",
+      "imgref": "ghcr.io/tartaria-dev/tartaria:TAG",
+      "bootloader": "BOOTLOADER",
+      "filesystem": "btrfs",
+      "composefs": COMPOSEFS,
+      "needs_user_creation": true
+    }
+  ],
 
   "welcome_title": "Welcome to Tartaria!",
   "welcome_subtitle": "A fancy Arch/CachyOSv3 based bootc image that stays out of your way.",

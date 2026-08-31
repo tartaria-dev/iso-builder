@@ -100,7 +100,16 @@ podman-chroot 'rm -rf /usr/lib/subsystem/rootfs/rootfs.dsk /usr/lib/flatpak-sysa
 
 # add installer recipe
 podman-chroot 'cp /app/recipe.json /etc/bootc-installer/recipe.json'
-podman-chroot "sed -i 's/PLACEHOLDER/${ISO_NAME#*-}/g' /etc/bootc-installer/recipe.json"
+podman-chroot "sed -i 's/TAG/${ISO_NAME#*-}/g' /etc/bootc-installer/recipe.json"
+
+# configure bootloader/composefs in recipe
+if [[ "${ISO_NAME#*-}" == *mahleb || "${ISO_NAME#*-}" == *saffron ]]; then
+  podman-chroot "sed -i 's/BOOTLOADER/systemd/g' /etc/bootc-installer/recipe.json"
+  podman-chroot "sed -i 's/COMPOSEFS/true/g' /etc/bootc-installer/recipe.json"
+else
+  podman-chroot "sed -i 's/BOOTLOADER/grub2/g' /etc/bootc-installer/recipe.json"
+  podman-chroot "sed -i 's/COMPOSEFS/false/g' /etc/bootc-installer/recipe.json"
+fi
 
 # Add contents from skel to /etc/skel
 rsync -rltDxv $_SCRIPTDIR/skel/ $SQUASHFS_CTR_IMAGE_MOUNTPOINT/etc/skel/
