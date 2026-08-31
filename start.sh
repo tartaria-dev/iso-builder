@@ -103,7 +103,7 @@ podman-chroot 'cp /app/recipe.json /etc/bootc-installer/recipe.json'
 podman-chroot "sed -i 's/TAG/${ISO_NAME#*-}/g' /etc/bootc-installer/recipe.json"
 
 # configure bootloader/composefs in recipe
-if [[ "${ISO_NAME#*-}" == *mahleb || "${ISO_NAME#*-}" == *saffron ]]; then
+if [[ "$ISO_NAME" == *mahleb || "$ISO_NAME" == *saffron ]]; then
   podman-chroot "sed -i 's/BOOTLOADER/systemd/g' /etc/bootc-installer/recipe.json"
   podman-chroot "sed -i 's/COMPOSEFS/true/g' /etc/bootc-installer/recipe.json"
 else

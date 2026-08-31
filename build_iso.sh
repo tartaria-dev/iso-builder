@@ -43,10 +43,16 @@ mkdir -p iso_files/{boot,LiveOS}
 # Replace container's resolv.conf with resolved
 ln -sf ../run/systemd/resolve/stub-resolv.conf $SQUASHFS_CTR_IMG_ROOTFS/etc/resolv.conf
 
-# Copy over the kernel & initrd
+# Move over the kernel & initrd
 kver=$(find $SQUASHFS_CTR_IMG_ROOTFS/usr/lib/modules -maxdepth 1 -printf "%P" | head -1)
-cp $SQUASHFS_CTR_IMG_ROOTFS/usr/lib/modules/$kver/vmlinuz iso_files/boot/vmlinuz
-cp $SQUASHFS_CTR_IMG_ROOTFS/live-initramfs.img iso_files/boot/initramfs.img && rm -f $SQUASHFS_CTR_IMG_ROOTFS/live-initramfs.img
+cp $SQUASHFS_CTR_IMG_ROOTFS/live-initramfs.img iso_files/boot/initramfs.img
+rm -f $SQUASHFS_CTR_IMG_ROOTFS/live-initramfs.img
+if [[ "$ISO_NAME" == *mahleb || "$ISO_NAME" == *saffron ]]; then
+  cp $SQUASHFS_CTR_IMG_ROOTFS/usr/share/split-kernel/$kver/vmlinuz iso_files/boot/vmlinuz
+  rm -rf $SQUASHFS_CTR_IMG_ROOTFS/usr/share/split-kernel
+else
+  cp $SQUASHFS_CTR_IMG_ROOTFS/usr/lib/modules/$kver/vmlinuz iso_files/boot/vmlinuz
+fi
 
 # Copy grub.cfg.
 # We put the cfg file under EFI/fedora in the ISO 9660 filesystem
