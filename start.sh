@@ -76,12 +76,11 @@ sudo rm -f $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/local
 sudo mkdir -p $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/local/bin
 
 # clone bootc-installer and install it
-podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules -b v3.0.16 --depth 1 https://github.com/projectbluefin/bootc-installer /buildhome/bootc-installer"'
-podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && for patch in /app/installer-patches/*.patch; do git apply \"\$patch\" || exit 1; done"'
+podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules -b latest-dev --depth 1 https://github.com/tuna-os/bootc-installer /buildhome/bootc-installer"'
 podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
 
 # clone fisherman and install it to /usr/local/bin/fisherman
-podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --depth 1 -b v0.2.1 https://github.com/projectbluefin/fisherman /buildhome/fisherman"'
+podman-chroot 'runuser -u builder -- bash -c "git clone --quiet https://github.com/projectbluefin/fisherman /buildhome/fisherman && cd /buildhome/fisherman && git switch --detach 35c8f6f"'
 podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman && GOCACHE=/buildhome/gocache GOPATH=/buildhome/gopath GOPROXY=off go build -o /buildhome/fisherman/fisherman-bin ./cmd/fisherman && sudo install -Dm755 /buildhome/fisherman/fisherman-bin /usr/local/bin/fisherman"'
 
 # cleanup
@@ -89,7 +88,7 @@ podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
 podman-chroot 'pacman -Rns --noconfirm ninja meson blueprint-compiler go'
 
 # install/remove some pkgs
-podman-chroot 'pacman -Rns --noconfirm gnome-keyring dotnet-runtime dotnet-sdk base-devel valent mkosi sysprof docker docker-buildx docker-compose flatpak cups cups-browsed hplip samba smbclient evolution-data-server tuned tuned-ppd ddcutil fprintd gpu-screen-recorder ttf-arphic-uming ttf-baekmuk wqy-microhei ttf-croscore ttf-droid gnu-free-fonts powertop libva-intel-driver ffmpegthumbs bazaar flatseal'
+podman-chroot 'pacman -Rns --noconfirm gnome-keyring valent mkosi flatpak cups cups-browsed hplip samba smbclient tuned tuned-ppd ddcutil fprintd gpu-screen-recorder ttf-arphic-uming ttf-baekmuk wqy-microhei ttf-croscore ttf-droid gnu-free-fonts powertop libva-intel-driver bazaar flatseal'
 podman-chroot 'pacman -S --noconfirm --needed firefox fuse-overlayfs'
 
 # create bootc-installer conf dir
