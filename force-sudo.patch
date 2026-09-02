@@ -1,0 +1,29 @@
+diff --git a/bootc_installer/defaults/slurp.py b/bootc_installer/defaults/slurp.py
+index 61a112ce..261b638d 100644
+--- a/bootc_installer/defaults/slurp.py
++++ b/bootc_installer/defaults/slurp.py
+@@ -199,7 +199,7 @@ class BootcDefaultSlurp(Adw.Bin):
+         if _IN_FLATPAK:
+             cmd = ["flatpak-spawn", "--host", "pkexec", fisherman_path, "scan", disk]
+         else:
+-            cmd = ["pkexec", fisherman_path, "scan", disk]
++            cmd = ["sudo", fisherman_path, "scan", disk]
+ 
+         try:
+             result = subprocess.run(
+diff --git a/bootc_installer/views/progress.py b/bootc_installer/views/progress.py
+index 1b82ee8f..4c084737 100644
+--- a/bootc_installer/views/progress.py
++++ b/bootc_installer/views/progress.py
+@@ -72,10 +72,8 @@ def _fisherman_argv_direct(recipe: str) -> list:
+         else:
+             cmd = f'pkexec "{_FISHERMAN_HOST_PATH}" "$1" >"{log}" 2>&1; exit $?'
+         return ["flatpak-spawn", "--host", "bash", "-c", cmd, "--", recipe]
+-    elif _LIVE_ISO:
+-        return ["bash", "-c", f'sudo /usr/local/bin/fisherman "$1" >"{log}" 2>&1; exit $?', "--", recipe]
+     else:
+-        return ["bash", "-c", f'pkexec /usr/local/bin/fisherman "$1" >"{log}" 2>&1; exit $?', "--", recipe]
++        return ["bash", "-c", f'sudo /usr/local/bin/fisherman "$1" >"{log}" 2>&1; exit $?', "--", recipe]
+ 
+ 
+ def _path_is_private(path: str, check_mode: bool = True) -> bool:
