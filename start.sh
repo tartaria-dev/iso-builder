@@ -69,7 +69,7 @@ podman-chroot 'mkdir -p /etc/sudoers.d /buildhome && echo "builder ALL=(ALL) NOP
 podman-chroot 'chown builder:builder /buildhome'
 
 # install build pkgs
-podman-chroot 'pacman -S --noconfirm --needed ninja meson blueprint-compiler mutter go >/dev/null'
+podman-chroot 'pacman -S --noconfirm --needed sudo ninja meson blueprint-compiler mutter go >/dev/null'
 
 # remove usrlocal symlink, replace with dir
 sudo rm -f $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/local
