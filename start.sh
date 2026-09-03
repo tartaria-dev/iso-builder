@@ -113,6 +113,9 @@ else
   podman-chroot "sed -i 's/COMPOSEFS/false/g' /etc/bootc-installer/recipe.json"
 fi
 
+# disable udiskie, automounting is problematic
+podman-chroot 'systemctl --global disable udiskie.service'
+
 # Add contents from skel to /etc/skel
 rsync -rltDxv $_SCRIPTDIR/skel/ $SQUASHFS_CTR_IMAGE_MOUNTPOINT/etc/skel/
 
