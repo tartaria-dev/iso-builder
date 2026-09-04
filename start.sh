@@ -80,7 +80,7 @@ podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --recurse-submod
 podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && git apply /app/patches/force-sudo.patch && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
 
 # clone fisherman and install it to /usr/local/bin/fisherman
-podman-chroot 'runuser -u builder -- bash -c "git clone --quiet https://github.com/tuna-os/fisherman /buildhome/fisherman"'
+podman-chroot 'runuser -u builder -- bash -c "git clone --quiet https://github.com/tuna-os/fisherman /buildhome/fisherman && cd /buildhome/fisherman && git apply /app/patches/disk-backed-var-tmp.patch"'
 podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman && GOCACHE=/buildhome/gocache GOPATH=/buildhome/gopath GOPROXY=off go build -o /buildhome/fisherman/fisherman-bin ./cmd/fisherman && sudo install -Dm755 /buildhome/fisherman/fisherman-bin /usr/local/bin/fisherman"'
 
 # cleanup
