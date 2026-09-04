@@ -88,7 +88,7 @@ podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
 podman-chroot 'pacman -Rns --noconfirm ninja meson blueprint-compiler go'
 
 # install/remove some pkgs
-podman-chroot 'pacman -Rns --noconfirm gnome-keyring valent mkosi flatpak cups cups-browsed hplip samba smbclient tuned tuned-ppd ddcutil fprintd gpu-screen-recorder ttf-arphic-uming ttf-baekmuk wqy-microhei ttf-croscore ttf-droid gnu-free-fonts powertop libva-intel-driver bazaar flatseal'
+podman-chroot 'pacman -Rns --noconfirm gnome-keyring valent mkosi flatpak cups cups-browsed samba smbclient tuned tuned-ppd ddcutil fprintd gpu-screen-recorder ttf-arphic-uming ttf-baekmuk wqy-microhei ttf-croscore ttf-droid gnu-free-fonts powertop libva-intel-driver bazaar flatseal'
 podman-chroot 'pacman -S --noconfirm --needed firefox fuse-overlayfs'
 
 # create bootc-installer conf dir
