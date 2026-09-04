@@ -163,7 +163,7 @@ SQUASHFS_CTR_IMAGE_MOUNTPOINT=$(podman mount ${CONTAINER_ID})
 trap "echo -e 'Cleaning up podman images\n' && podman rm -f ${CONTAINER_ID}" EXIT
 
 # pull image to ISO
-podman-chroot "podman pull ghcr.io/tartaria-dev/tartaria:${ISO_NAME#*-}"
+podman-chroot "podman pull ghcr.io/tartaria-dev/tartaria:${ISO_NAME}"
 
 github-step-end
 
