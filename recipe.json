@@ -12,9 +12,9 @@
     {
       "name": "Tartaria",
       "imgref": "ghcr.io/tartaria-dev/tartaria:TAG",
-      "bootloader": "BOOTLOADER",
+      "bootloader": "systemd",
       "filesystem": "btrfs",
-      "composefs": COMPOSEFS,
+      "composefs": true,
       "needs_user_creation": true
     }
   ],

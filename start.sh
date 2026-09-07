@@ -61,6 +61,7 @@ github-step "System Setup"
 # configure liveuser
 podman-chroot 'sed -i "/vt = 1/a \\\n[initial_session]\ncommand = \"niri-session\"\nuser = \"liveuser\"" /etc/greetd/config.toml'
 podman-chroot "echo 'polkit.addRule(function(action, subject) { if (subject.user == \"liveuser\") { return polkit.Result.YES; } });' | tee /etc/polkit-1/rules.d/49-liveuser.rules > /dev/null"
+podman-chroot "sed -i '1i spawn-sh-at-startup \"noctalia msg caffeine-toggle\"' /usr/share/tartaria/cherries/dot_config/niri/config.kdl"
 podman-chroot "sed -i '1i spawn-sh-at-startup \"bootc-installer\"' /usr/share/tartaria/cherries/dot_config/niri/config.kdl"
 
 # create temp build user
@@ -102,16 +103,7 @@ podman-chroot 'rm -rf /usr/lib/subsystem/rootfs/rootfs.dsk /usr/lib/flatpak-sysa
 
 # add installer recipe
 podman-chroot 'cp /app/recipe.json /etc/bootc-installer/recipe.json'
-podman-chroot "sed -i 's/TAG/${ISO_NAME#*-}/g' /etc/bootc-installer/recipe.json"
-
-# configure bootloader/composefs in recipe
-if [[ "$ISO_NAME" == *mahleb || "$ISO_NAME" == *saffron ]]; then
-  podman-chroot "sed -i 's/BOOTLOADER/systemd/g' /etc/bootc-installer/recipe.json"
-  podman-chroot "sed -i 's/COMPOSEFS/true/g' /etc/bootc-installer/recipe.json"
-else
-  podman-chroot "sed -i 's/BOOTLOADER/grub2/g' /etc/bootc-installer/recipe.json"
-  podman-chroot "sed -i 's/COMPOSEFS/false/g' /etc/bootc-installer/recipe.json"
-fi
+podman-chroot "sed -i 's/TAG/stable-${ISO_NAME#*-}/g' /etc/bootc-installer/recipe.json"
 
 # disable udiskie, automounting is problematic
 podman-chroot 'systemctl --global disable udiskie.service'
