@@ -1,0 +1,231 @@
+config_version = 12
+
+[audio]
+enable_sounds = true
+
+[backdrop]
+blur_intensity = 0.89999997988343239
+enabled = true
+
+[bar]
+order = [ "Main" ]
+
+    [bar.Main]
+    capsule_radius = 7
+    center = [ "workspaces" ]
+    concave_edge_corners = false
+    end = [ "tray", "network", "bluetooth", "battery", "control-center", "notifications", "clock" ]
+    font_family = "Overpass ExtraBold"
+    font_weight = 800
+    margin_ends = 0
+    radius = 0
+    scale = 1.0500000081956387
+    start = [ "launcher", "group:g1", "media" ]
+    thickness = 36
+    widget_spacing = 12
+
+        [[bar.Main.capsule_group]]
+        accordion = false
+        accordion_direction = "end"
+        enabled = true
+        fill = "surface_variant"
+        id = "g1"
+        members = [ "cpu", "temp", "ram", "sysmon" ]
+        opacity = 0.0
+        padding = 6.0
+        radius = 7.0
+        widget_spacing = 6
+
+[battery.device."/org/freedesktop/UPower/devices/headset_dev_C4_A9_B8_6B_24_56"]
+warning_threshold = 0
+
+[brightness]
+enable_ddcutil = true
+
+[control_center]
+sidebar_section = "none"
+width = 600
+
+    [[control_center.shortcuts]]
+    type = "wifi"
+
+    [[control_center.shortcuts]]
+    type = "bluetooth"
+
+    [[control_center.shortcuts]]
+    type = "power_profile"
+
+    [[control_center.shortcuts]]
+    type = "caffeine"
+
+    [[control_center.shortcuts]]
+    type = "nightlight"
+
+    [[control_center.shortcuts]]
+    type = "notification"
+
+[idle]
+behavior_order = [ "lock", "screen-off", "lock-and-suspend" ]
+
+    [idle.behavior.lock]
+    action = "lock"
+    enabled = false
+    timeout = 180.0
+
+    [idle.behavior.lock-and-suspend]
+    action = "lock_and_suspend"
+    enabled = false
+    timeout = 240.0
+
+    [idle.behavior.screen-off]
+    action = "screen_off"
+    enabled = false
+    timeout = 210.0
+
+[location]
+auto_locate = true
+
+[lockscreen_widgets]
+schema_version = 2
+widget_order = []
+
+    [lockscreen_widgets.grid]
+    cell_size = 16
+    major_interval = 4
+    visible = true
+
+[notification]
+layer = "overlay"
+offset_x = 9
+
+[osd]
+position = "bottom_center"
+
+    [osd.kinds]
+    media = false
+
+[plugins]
+enabled = []
+
+[shell]
+corner_radius_scale = 1.3500000201165676
+font_family = "Overpass ExtraBold"
+password_style = "random"
+polkit_agent = true
+
+    [shell.animation]
+    speed = 1.6000000238418579
+
+    [shell.launcher]
+    categories = false
+
+    [shell.panel]
+    open_near_click_control_center = true
+    session_placement = "floating"
+    session_position = "center"
+
+    [shell.session]
+    grid = true
+
+        [[shell.session.actions]]
+        action = "lock"
+        countdown_seconds = 3.0
+        enabled = false
+        shortcut = "1"
+        variant = "default"
+    
+        [[shell.session.actions]]
+        action = "lock_and_suspend"
+        countdown_seconds = 3.0
+        enabled = false
+        glyph = "lock-bolt"
+        shortcut = "2"
+        variant = "default"
+    
+        [[shell.session.actions]]
+        action = "suspend"
+        countdown_seconds = 3.0
+        enabled = false
+        shortcut = "3"
+        variant = "default"
+    
+        [[shell.session.actions]]
+        action = "logout"
+        countdown_seconds = 3.0
+        enabled = false
+        shortcut = "4"
+        variant = "default"
+    
+        [[shell.session.actions]]
+        action = "reboot"
+        countdown_seconds = 3.0
+        enabled = true
+        shortcut = "5"
+        variant = "default"
+    
+        [[shell.session.actions]]
+        action = "shutdown"
+        countdown_seconds = 3.0
+        enabled = true
+        shortcut = "6"
+        variant = "destructive"
+
+    [shell.shadow]
+    direction = "center"
+
+[theme]
+source = "wallpaper"
+
+    [theme.templates]
+    builtin_ids = [ "btop", "cava", "gtk3", "gtk4", "kcolorscheme", "kitty", "niri", "qt" ]
+
+[wallpaper]
+directory = "/usr/share/tartaria/wallpapers"
+transition_on_startup = true
+
+    [wallpaper.default]
+    path = "/usr/share/tartaria/wallpapers/cherry_tree.png"
+
+    [wallpaper.last]
+    path = "/usr/share/tartaria/wallpapers/cherry_tree.png"
+
+[weather]
+refresh_minutes = 10
+unit = "imperial"
+
+[widget.battery]
+show_label = false
+
+[widget.clock]
+format = "{:%I:%M %p, %a %d}"
+scale = 0.94999999999999996
+
+[widget.control-center]
+glyph = "settings"
+
+[widget.cpu]
+show_value = false
+
+[widget.launcher]
+glyph = "rocket"
+
+[widget.media]
+album_art_only = true
+
+[widget.network]
+show_label = false
+vpn_status = "both"
+
+[widget.ram]
+show_value = false
+
+[widget.sysmon]
+show_value = false
+stat = "disk_free_pct"
+
+[widget.temp]
+show_value = false
+
+[widget.workspaces]
+focused_output_only = true
+style = "focus_hint"

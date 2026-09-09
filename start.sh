@@ -59,9 +59,9 @@ function podman-chroot(){
 github-step "System Setup"
 
 # configure liveuser
+podman-chroot 'cp /app/files/settings.toml /usr/share/tartaria/cherries/dot_local/state/noctalia/settings.toml'
 podman-chroot 'sed -i "/vt = 1/a \\\n[initial_session]\ncommand = \"niri-session\"\nuser = \"liveuser\"" /etc/greetd/config.toml'
 podman-chroot "echo 'polkit.addRule(function(action, subject) { if (subject.user == \"liveuser\") { return polkit.Result.YES; } });' | tee /etc/polkit-1/rules.d/49-liveuser.rules > /dev/null"
-podman-chroot "sed -i '1i spawn-sh-at-startup \"noctalia msg caffeine-toggle\"' /usr/share/tartaria/cherries/dot_config/niri/config.kdl"
 podman-chroot "sed -i '1i spawn-sh-at-startup \"bootc-installer\"' /usr/share/tartaria/cherries/dot_config/niri/config.kdl"
 
 # create temp build user
@@ -96,14 +96,11 @@ podman-chroot 'pacman -S --noconfirm --needed firefox fuse-overlayfs'
 # create bootc-installer conf dir
 podman-chroot 'mkdir -p /etc/bootc-installer'
 
-# copy distro logo to icon dir
-podman-chroot 'cp /usr/share/pixmaps/tartaria-text-logo.svg /usr/share/icons/default-icons-grey-dark/apps/scalable/distributor-logo-tartaria.svg'
-
 # remove unecessary files
 podman-chroot 'rm -rf /usr/lib/subsystem/rootfs/rootfs.dsk /usr/lib/flatpak-sysapps/flatpak-sysapps.dsk'
 
 # add installer recipe
-podman-chroot 'cp /app/recipe.json /etc/bootc-installer/recipe.json'
+podman-chroot 'cp /app/files/recipe.json /etc/bootc-installer/recipe.json'
 podman-chroot "sed -i 's/TAG/stable-${ISO_NAME#*-}/g' /etc/bootc-installer/recipe.json"
 
 # disable udiskie, automounting is problematic
