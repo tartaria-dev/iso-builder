@@ -86,7 +86,7 @@ podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman 
 sudo rm -f $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/bin/fisherman
 
 # cleanup
-podman-chroot 'userdel builder && rm` -rf /buildhome /etc/sudoers.d'
+podman-chroot 'userdel builder && rm -rf /buildhome /etc/sudoers.d'
 podman-chroot 'pacman -Rns --noconfirm ninja meson blueprint-compiler go'
 
 # install/remove some pkgs
