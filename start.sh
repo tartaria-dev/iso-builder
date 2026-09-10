@@ -78,7 +78,7 @@ sudo mkdir -p $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/local/bin
 
 # clone bootc-installer and install it
 podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules -b latest-dev --depth 1 https://github.com/tuna-os/bootc-installer /buildhome/bootc-installer"'
-podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && git apply /app/patches/{force-sudo-as-priv-esc,change-default-groups}.patch && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
+podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && git apply /app/patches/{force-sudo-as-priv-esc,change-default-groups,hash-pw-before-passing}.patch && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
 
 # clone fisherman and install it to /usr/local/bin/fisherman, replaces /usr/bin/fisherman installed by bootc-installer
 podman-chroot 'runuser -u builder -- bash -c "git clone --quiet https://github.com/tuna-os/fisherman /buildhome/fisherman && cd /buildhome/fisherman && git apply /app/patches/{var-tmp-no-tmpfs,no-pull-on-live-iso}.patch"'

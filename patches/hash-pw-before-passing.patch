@@ -1,0 +1,152 @@
+diff --git a/bootc_installer/utils/processor.py b/bootc_installer/utils/processor.py
+index 21b7a634..6af81e44 100644
+--- a/bootc_installer/utils/processor.py
++++ b/bootc_installer/utils/processor.py
+@@ -17,11 +17,58 @@
+ import json
+ import logging
+ import os
++import subprocess
+ import tempfile
+ 
+ logger = logging.getLogger("Installer::Processor")
+ 
+ 
++def _hash_user_password(password: str) -> str:
++    """Hash a plaintext user password into a crypt(3) string ("$6$salt$hash")
++    fisherman can write verbatim via `chpasswd -e`.
++
++    Passing plaintext straight through to fisherman forces it to hash the
++    password itself via `chpasswd` without -e, which invokes the target's PAM
++    stack (pam_chauthtok) to do so. On a composefs-native deploy fisherman
++    only has `chpasswd --root <dir>`, not a real chroot(2), so PAM's module
++    resolution doesn't line up with the target and the whole install aborts —
++    "pam_chauthtok() failed, error: Module is unknown" on some images,
++    "exit status 1" on others (EL10). Hashing here means fisherman never
++    invokes PAM to set the password at all, regardless of target quirks.
++
++    Already-hashed input (anything starting with "$", e.g. supplied via a
++    companion/mobile setup config) is returned unchanged — re-hashing a hash
++    would just make the literal hash text the real password.
++
++    Empty input is returned unchanged: CreateUser treats an empty password as
++    "leave the account unset", not "set an empty password".
++    """
++    if not password or password.startswith("$"):
++        return password
++
++    try:
++        import crypt  # stdlib, deprecated since 3.11, removed in 3.13.
++        return crypt.crypt(password, crypt.mksalt(crypt.METHOD_SHA512))
++    except ImportError:
++        pass
++
++    # crypt module unavailable (Python >= 3.13): fall back to openssl, which
++    # is present on essentially every Linux host/runtime this app ships on.
++    try:
++        result = subprocess.run(
++            ["openssl", "passwd", "-6", "-stdin"],
++            input=password, capture_output=True, text=True, check=True,
++        )
++        return result.stdout.strip()
++    except (OSError, subprocess.CalledProcessError) as e:
++        # Hashing failed entirely: surface the plaintext rather than silently
++        # producing an unusable/empty recipe field. fisherman will fall back
++        # to its own PAM-based chpasswd path (the behavior before this fix),
++        # which is at least what happened previously, not a new failure mode.
++        logger.warning("Could not hash user password (%s); passing through unhashed", e)
++        return password
++
++
+ def _find_nvidia_imgref_for(imgref: str) -> str:
+     """Search the image manifest for a nvidia_imgref associated with imgref.
+ 
+@@ -255,7 +302,7 @@ class Processor:
+         user_info = merged.get("user", {})
+         user_username = user_info.get("username", "")
+         user_fullname = user_info.get("fullname", "")
+-        user_password = user_info.get("password", "")
++        user_password = _hash_user_password(user_info.get("password", ""))
+         user_groups   = user_info.get("groups", [])
+ 
+         # Build the fisherman recipe
+diff --git a/tests/unit/test_processor.py b/tests/unit/test_processor.py
+index 8aa47de3..2be9d562 100644
+--- a/tests/unit/test_processor.py
++++ b/tests/unit/test_processor.py
+@@ -257,13 +257,22 @@ class TestUserSpec:
+         r = _load(path)
+         assert r["user"]["username"] == "alice"
+         assert r["user"]["fullname"] == "Alice Smith"
+-        assert r["user"]["password"] == "pass1"
++        # Plaintext must never reach the recipe: fisherman would then need to
++        # hash it itself via chpasswd's PAM path, which is what this whole
++        # fix avoids (see _hash_user_password).
++        assert r["user"]["password"] != "pass1"
++        assert r["user"]["password"].startswith("$")
++        import crypt
++        assert crypt.crypt("pass1", r["user"]["password"]) == r["user"]["password"]
+         assert r["user"]["groups"] == ["wheel"]
+ 
+     def test_empty_user_when_not_provided(self):
+         path = Processor.gen_install_recipe("log", _auto_finals(), _SYS_RECIPE)
+         r = _load(path)
+         assert r["user"]["username"] == ""
++        # No password requested: stays empty, not hashed into "$6$...$" of
++        # an empty string (CreateUser treats "" as "leave unset").
++        assert r["user"]["password"] == ""
+ 
+     def test_user_groups_default_empty(self):
+         user = {"username": "bob", "password": "p"}
+@@ -271,6 +280,51 @@ class TestUserSpec:
+         r = _load(path)
+         assert r["user"]["groups"] == []
+ 
++    def test_already_hashed_password_passed_through(self):
++        # A companion/mobile setup config (or any future caller) may already
++        # supply a crypt(3) hash. Re-hashing it would make the literal hash
++        # text the account's real password.
++        prehashed = "$6$abcdsalt$" + "x" * 86
++        user = {"username": "carol", "password": prehashed}
++        path = Processor.gen_install_recipe("log", _auto_finals(user=user), _SYS_RECIPE)
++        r = _load(path)
++        assert r["user"]["password"] == prehashed
++
++
++class TestHashUserPassword:
++    def test_plaintext_is_hashed(self):
++        import crypt
++        from bootc_installer.utils.processor import _hash_user_password
++        hashed = _hash_user_password("hunter2")
++        assert hashed.startswith("$6$")
++        assert crypt.crypt("hunter2", hashed) == hashed
++
++    def test_two_calls_use_different_salts(self):
++        from bootc_installer.utils.processor import _hash_user_password
++        assert _hash_user_password("hunter2") != _hash_user_password("hunter2")
++
++    def test_empty_password_untouched(self):
++        from bootc_installer.utils.processor import _hash_user_password
++        assert _hash_user_password("") == ""
++
++    def test_already_hashed_password_untouched(self):
++        from bootc_installer.utils.processor import _hash_user_password
++        prehashed = "$6$salt$hash"
++        assert _hash_user_password(prehashed) == prehashed
++
++    def test_falls_back_to_plaintext_when_hashing_unavailable(self, monkeypatch):
++        import bootc_installer.utils.processor as mod
++        import subprocess as _subprocess
++
++        def _boom(*a, **k):
++            raise _subprocess.CalledProcessError(1, "openssl")
++
++        # Simulate stdlib crypt being gone (Python >= 3.13) AND openssl
++        # unavailable/failing: must not raise, must not fabricate a value.
++        monkeypatch.setitem(__import__("sys").modules, "crypt", None)
++        monkeypatch.setattr(mod.subprocess, "run", _boom)
++        assert mod._hash_user_password("hunter2") == "hunter2"
++
+ 
+ # ── unified storage tests ─────────────────────────────────────────────────────
+ 
