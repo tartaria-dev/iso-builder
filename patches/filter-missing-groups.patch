@@ -1,0 +1,214 @@
+diff --git a/fisherman/internal/post/user.go b/fisherman/internal/post/user.go
+index 6b9c18f..0e78510 100644
+--- a/fisherman/internal/post/user.go
++++ b/fisherman/internal/post/user.go
+@@ -74,12 +74,24 @@ func CreateUser(sysroot string, u UserConfig) error {
+ 	// exists during deploy; --root only edits the passwd files, and the
+ 	// booted-host PAM problem that forced chroot is ostree-only — composefs
+ 	// deploys happen in the initramfs).
++	// Filter u.Groups down to groups that actually exist in the TARGET's own
++	// /etc/group. Recipe-supplied groups such as "libvirt" or "docker" only
++	// exist on images that ship the corresponding package; passing a group
++	// useradd can't find aborts account creation entirely (useradd exit 6,
++	// "group does not exist"), and CreateUser's caller treats that as fatal —
++	// one optional group must not kill the whole install. Any dropped groups
++	// are reported so the omission is visible, not silent.
++	groups, missingGroups := filterExistingGroups(root, u.Groups)
++	if len(missingGroups) > 0 {
++		fmt.Printf("  warning: skipping group(s) not present on this image: %s\n", strings.Join(missingGroups, ", "))
++	}
++
+ 	tail := []string{"useradd", "--create-home", "--shell", "/bin/bash"}
+ 	if u.Fullname != "" {
+ 		tail = append(tail, "--comment", u.Fullname)
+ 	}
+-	if len(u.Groups) > 0 {
+-		tail = append(tail, "--groups", strings.Join(u.Groups, ","))
++	if len(groups) > 0 {
++		tail = append(tail, "--groups", strings.Join(groups, ","))
+ 	}
+ 	tail = append(tail, u.Username)
+ 
+@@ -175,6 +187,41 @@ func CreateUser(sysroot string, u UserConfig) error {
+ 	return nil
+ }
+ 
++// filterExistingGroups reads root/etc/group (the TARGET's own group database,
++// not the host's) and splits groups into those present there and those that
++// aren't. Called with the same root CreateUser is about to hand to useradd, so
++// the check reflects exactly what useradd itself would see.
++//
++// If root/etc/group can't be read, filtering is skipped entirely (groups is
++// returned unchanged, missing is nil) rather than silently dropping every
++// group: an unreadable file means the check itself is unreliable, and
++// useradd's own error is a clearer signal than a fabricated "all groups
++// missing" warning.
++func filterExistingGroups(root string, groups []string) (kept, missing []string) {
++	if len(groups) == 0 {
++		return nil, nil
++	}
++	data, err := os.ReadFile(filepath.Join(root, "etc", "group"))
++	if err != nil {
++		return groups, nil
++	}
++	existing := make(map[string]bool, strings.Count(string(data), "\n"))
++	for _, line := range strings.Split(string(data), "\n") {
++		name, _, ok := strings.Cut(line, ":")
++		if ok && name != "" {
++			existing[name] = true
++		}
++	}
++	for _, g := range groups {
++		if existing[g] {
++			kept = append(kept, g)
++		} else {
++			missing = append(missing, g)
++		}
++	}
++	return kept, missing
++}
++
+ // writeHomeTmpfiles drops a tmpfiles.d snippet under <root>/etc/tmpfiles.d that
+ // makes the first boot create /var/home/<user> from /etc/skel if missing and
+ // restore ownership + SELinux labels under the live policy — offline useradd
+diff --git a/fisherman/internal/post/user_test.go b/fisherman/internal/post/user_test.go
+index 7248fa6..314d529 100644
+--- a/fisherman/internal/post/user_test.go
++++ b/fisherman/internal/post/user_test.go
+@@ -79,6 +79,136 @@ func TestCreateUserRelocatesHomeToStaterootVar(t *testing.T) {
+ 	}
+ }
+ 
++// TestCreateUserSkipsMissingGroups is the regression test for the useradd
++// exit-6 crash: a recipe-supplied group (e.g. "libvirt") that isn't present in
++// the target's own /etc/group — because the image doesn't ship the package
++// that creates it — must be dropped with a warning rather than passed to
++// useradd, where it aborts account creation (and, via CreateUser's fatal
++// caller, the whole install) over one optional group.
++func TestCreateUserSkipsMissingGroups(t *testing.T) {
++	sysroot := t.TempDir()
++	deployDir := filepath.Join(sysroot, "ostree", "deploy", "default", "deploy", "abc123.0")
++	if err := os.MkdirAll(filepath.Join(deployDir, "etc"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	// The target's own /etc/group: has "wheel" and "video", but no "libvirt"
++	// or "docker" (image doesn't ship those packages).
++	groupFile := "root:x:0:\nwheel:x:10:\nvideo:x:39:\n"
++	if err := os.WriteFile(filepath.Join(deployDir, "etc", "group"), []byte(groupFile), 0o644); err != nil {
++		t.Fatal(err)
++	}
++
++	origDeployFn := DeploymentDirFn
++	defer func() { DeploymentDirFn = origDeployFn }()
++	DeploymentDirFn = func(string) (string, error) { return deployDir, nil }
++
++	var calls [][]string
++	origRunFn := runner.RunFn
++	defer func() { runner.RunFn = origRunFn }()
++	runner.RunFn = func(_ io.Reader, name string, args ...string) error {
++		calls = append(calls, append([]string{name}, args...))
++		if name == "ls" {
++			_, err := os.Stat(args[len(args)-1])
++			return err
++		}
++		return nil
++	}
++
++	err := CreateUser(sysroot, UserConfig{
++		Username: "dave",
++		Groups:   []string{"wheel", "libvirt", "video", "docker"},
++	})
++	if err != nil {
++		t.Fatalf("CreateUser: %v", err)
++	}
++
++	var groupsArg string
++	for _, c := range calls {
++		if c[0] == "chroot" && len(c) > 2 && c[2] == "useradd" {
++			for i, a := range c {
++				if a == "--groups" && i+1 < len(c) {
++					groupsArg = c[i+1]
++				}
++			}
++		}
++	}
++	if groupsArg == "" {
++		t.Fatalf("useradd was not called with --groups; calls: %v", calls)
++	}
++	if strings.Contains(groupsArg, "libvirt") || strings.Contains(groupsArg, "docker") {
++		t.Errorf("--groups %q still contains a group missing from the target's /etc/group", groupsArg)
++	}
++	if !strings.Contains(groupsArg, "wheel") || !strings.Contains(groupsArg, "video") {
++		t.Errorf("--groups %q dropped a group that DOES exist on the target", groupsArg)
++	}
++}
++
++// TestCreateUserAllGroupsMissingOmitsFlag verifies that when every
++// recipe-supplied group is absent from the target, --groups is omitted
++// entirely rather than passed as an empty string (which useradd itself would
++// reject).
++func TestCreateUserAllGroupsMissingOmitsFlag(t *testing.T) {
++	sysroot := t.TempDir()
++	deployDir := filepath.Join(sysroot, "ostree", "deploy", "default", "deploy", "abc123.0")
++	if err := os.MkdirAll(filepath.Join(deployDir, "etc"), 0o755); err != nil {
++		t.Fatal(err)
++	}
++	if err := os.WriteFile(filepath.Join(deployDir, "etc", "group"), []byte("root:x:0:\n"), 0o644); err != nil {
++		t.Fatal(err)
++	}
++
++	origDeployFn := DeploymentDirFn
++	defer func() { DeploymentDirFn = origDeployFn }()
++	DeploymentDirFn = func(string) (string, error) { return deployDir, nil }
++
++	var calls [][]string
++	origRunFn := runner.RunFn
++	defer func() { runner.RunFn = origRunFn }()
++	runner.RunFn = func(_ io.Reader, name string, args ...string) error {
++		calls = append(calls, append([]string{name}, args...))
++		if name == "ls" {
++			_, err := os.Stat(args[len(args)-1])
++			return err
++		}
++		return nil
++	}
++
++	if err := CreateUser(sysroot, UserConfig{Username: "erin", Groups: []string{"libvirt"}}); err != nil {
++		t.Fatalf("CreateUser: %v", err)
++	}
++	for _, c := range calls {
++		if c[0] == "chroot" && len(c) > 2 && c[2] == "useradd" {
++			for _, a := range c {
++				if a == "--groups" {
++					t.Errorf("--groups should be omitted when no groups exist on the target; calls: %v", calls)
++				}
++			}
++		}
++	}
++}
++
++// TestFilterExistingGroups_UnreadableGroupFile verifies that when the target's
++// /etc/group can't be read at all, filtering is skipped (groups pass through
++// unchanged) rather than treating every group as missing.
++func TestFilterExistingGroups_UnreadableGroupFile(t *testing.T) {
++	root := t.TempDir() // no etc/group present
++	kept, missing := filterExistingGroups(root, []string{"wheel", "libvirt"})
++	if len(missing) != 0 {
++		t.Errorf("missing = %v, want none (unreadable group file should not fabricate missing groups)", missing)
++	}
++	if strings.Join(kept, ",") != "wheel,libvirt" {
++		t.Errorf("kept = %v, want groups to pass through unchanged", kept)
++	}
++}
++
++func TestFilterExistingGroups_NoGroupsRequested(t *testing.T) {
++	root := t.TempDir()
++	kept, missing := filterExistingGroups(root, nil)
++	if kept != nil || missing != nil {
++		t.Errorf("expected (nil, nil) for no requested groups, got (%v, %v)", kept, missing)
++	}
++}
++
+ // useradd --root from a booted host initializes the host PAM/SELinux stack
+ // and fails against a writable target etc (wootc run 20260723T0738). User
+ // tooling must run via chroot with the target's own binaries.
