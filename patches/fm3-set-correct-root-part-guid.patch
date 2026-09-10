@@ -1,0 +1,290 @@
+diff --git a/fisherman/cmd/fisherman/main.go b/fisherman/cmd/fisherman/main.go
+index 3fcbd07..843230a 100644
+--- a/fisherman/cmd/fisherman/main.go
++++ b/fisherman/cmd/fisherman/main.go
+@@ -5,6 +5,7 @@ import (
+ 	"os"
+ 	"os/exec"
+ 	"path/filepath"
++	"runtime"
+ 	"syscall"
+ 
+ 	"github.com/tuna-os/fisherman/internal/disk"
+@@ -101,6 +102,22 @@ var lookPath = exec.LookPath
+ //   - overlayfs: used by dmsquash-live (dracut) live ISOs where / and /var
+ //     are an overlay on top of a squashfs; the writable upper layer has only
+ //     a few GiB available
++//
++// gptRootRetagPartition reports which partition number holds root and should
++// be retagged to the Discoverable Partitions Specification root GUID for GPT
++// auto-discovery on a composefs-native ("sealed") install, and whether it
++// should happen at all for this configuration. See the call site for the
++// full rationale (bootloader, LUKS, ZFS, and manual-layout considerations).
++func gptRootRetagPartition(isManual, isSystemdBoot bool, filesystem string, composeFsBackend bool) (partNum int, ok bool) {
++	if isManual || filesystem == "zfs" || !composeFsBackend {
++		return 0, false
++	}
++	if isSystemdBoot {
++		return 2, true // 2-partition layout: p1=EFI, p2=root
++	}
++	return 3, true // 3-partition layout: p1=EFI, p2=/boot, p3=root
++}
++
+ func isSpaceConstrained(path string) bool {
+ 	var st syscall.Statfs_t
+ 	if err := syscall.Statfs(path, &st); err != nil {
+@@ -385,6 +402,7 @@ func main() {
+ 	var activeTargetMount string
+ 	var activeEfiPart string
+ 	var activeRootPart string  // only used for TPM2 enrolment, empty in manual mode
++	var activeRootDev string   // raw partition, or /dev/mapper/<name> if LUKS; empty in manual mode
+ 	var activeLuksUUID string  // LUKS partition UUID for boot entry injection; empty if no encryption
+ 	var luksRecoveryKey string // random passphrase for tpm2-luks (emitted as recovery key)
+ 
+@@ -570,6 +588,7 @@ func main() {
+ 
+ 		activeTargetMount = targetMount
+ 		activeEfiPart = efiPart
++		activeRootDev = rootDev
+ 	}
+ 
+ 	// ── Step 5.5: Mount /var disk (optional) ─────────────────────────────────
+@@ -664,19 +683,44 @@ func main() {
+ 		fatal("bootc install: %v", err)
+ 	}
+ 
+-	// systemd-boot composefs installs rely on GPT auto-discovery for the root
+-	// filesystem. Keep the auto-partitioned root on the architecture-specific
+-	// Linux root GUID so the installed system can find /sysroot on first boot.
+-	if !isManual && isSystemdBoot && !hasEncryption && r.ComposeFsBackend {
++	// gptRootRetagPartition reports which partition number should be retagged
++	// to the Discoverable Partitions Specification root GUID for GPT
++	// auto-discovery, and whether it should happen at all. Extracted as a
++	// pure function so the decision logic itself is unit-testable without
++	// mocking the whole install flow.
++	//
++	// Composefs-native ("sealed") images boot without a static root= kernel
++	// argument — the disk is partitioned at install time, so no UUID is known
++	// at image-build time — and rely entirely on systemd-gpt-auto-generator
++	// finding a partition tagged with this GUID. This applies:
++	//   - regardless of bootloader: grub2's 3-partition layout needs its root
++	//     (p3) retagged just as much as systemd-boot's 2-partition layout
++	//     (p2) does — omitting the retag for either one hangs first boot the
++	//     same way, since neither embeds an explicit root=.
++	//   - even when LUKS-encrypted: EnsureLuksArgs' rd.luks.name=<UUID>=root
++	//     only tells the initrd how to name the unlocked mapper: the initrd
++	//     still finds the LUKS container itself via GPT auto-discovery on the
++	//     *raw* partition first, then unlocks it. Skipping the retag here
++	//     breaks that discovery before LUKS even enters the picture.
++	// ZFS is excluded: it has its own pool-based root discovery (zpool
++	// import via hostid/cache), not systemd-gpt-auto-generator, and is never
++	// tagged as a discoverable Linux root partition regardless of composefs.
++	// Manual/custom-mount layouts are excluded: fisherman doesn't create
++	// those partitions, so retagging one would mean guessing which of the
++	// user's own partitions is "root" and overwriting a GPT type they may
++	// have set deliberately.
++	if partNum, ok := gptRootRetagPartition(isManual, isSystemdBoot, r.Filesystem, r.ComposeFsBackend); ok {
+ 		progress.Info("Retagging root partition for systemd GPT auto-discovery")
+ 
+-		// Ensure BOOTX64.EFI is on the ESP before we touch the mount stack.
+-		// Newer bootctl (e.g. arch-bootc systemd ≥ v255) enables --graceful when
+-		// running in a container and silently skips writing to the ESP. Copying
+-		// directly from the ostree deployment is a reliable fallback and a no-op
+-		// when bootctl ran correctly (EFI/BOOT/BOOTX64.EFI already present).
+-		if err := install.InstallSystemdBoot(activeTargetMount); err != nil {
+-			progress.Info(fmt.Sprintf("Warning: could not ensure systemd-boot EFI binary: %v", err))
++		if isSystemdBoot {
++			// Ensure BOOTX64.EFI is on the ESP before we touch the mount stack.
++			// Newer bootctl (e.g. arch-bootc systemd ≥ v255) enables --graceful when
++			// running in a container and silently skips writing to the ESP. Copying
++			// directly from the ostree deployment is a reliable fallback and a no-op
++			// when bootctl ran correctly (EFI/BOOT/BOOTX64.EFI already present).
++			if err := install.InstallSystemdBoot(activeTargetMount); err != nil {
++				progress.Info(fmt.Sprintf("Warning: could not ensure systemd-boot EFI binary: %v", err))
++			}
+ 		}
+ 
+ 		// Unmount the EFI partition explicitly so the FAT32 state is flushed to
+@@ -687,10 +731,12 @@ func main() {
+ 
+ 		// Release kernel and userspace references to the root partition before
+ 		// modifying its GPT type. bootc install may have left active references.
+-		if err := disk.UnmountPartition(r.Disk, 2); err != nil {
++		// This unmounts the raw partition; for LUKS it stays open underneath
++		// (we're not closing the mapper, just dropping the filesystem mount).
++		if err := disk.UnmountPartition(r.Disk, partNum); err != nil {
+ 			fmt.Fprintf(os.Stderr, "warning: could not fully clean partition references: %v\n", err)
+ 		}
+-		if err := disk.SetPartitionType(r.Disk, 2, disk.GPTPartTypeLinuxRootX86_64); err != nil {
++		if err := disk.SetPartitionType(r.Disk, partNum, disk.GPTPartTypeLinuxRootForArch(runtime.GOARCH)); err != nil {
+ 			fatal("retagging root partition: %v", err)
+ 		}
+ 		// Remount root so finalization and post-install writes can proceed.
+@@ -701,8 +747,11 @@ func main() {
+ 		if err := os.MkdirAll(activeTargetMount, 0o755); err != nil {
+ 			fatal("recreating target mountpoint before remount: %v", err)
+ 		}
+-		rootPart := disk.PartName(r.Disk, 2)
+-		if err := disk.Mount(rootPart, activeTargetMount, ""); err != nil {
++		// rootDev, not the raw partition: when encrypted this is the LUKS
++		// mapper (/dev/mapper/<name>), which is what actually holds the
++		// filesystem. Retagging touches the raw partition's GPT entry only —
++		// LUKS itself is untouched and stays open underneath.
++		if err := disk.Mount(activeRootDev, activeTargetMount, ""); err != nil {
+ 			fatal("remounting root partition after retagging: %v", err)
+ 		}
+ 		// Remount EFI so that Plymouth/LUKS arg writes land on the real ESP
+@@ -710,6 +759,8 @@ func main() {
+ 		if err := disk.MountEFI(activeTargetMount, activeEfiPart); err != nil {
+ 			fmt.Fprintf(os.Stderr, "warning: could not remount EFI partition after retag: %v\n", err)
+ 		}
++		// grub2's separate ext4 /boot was never touched by the unmounts above
++		// (only the ESP and root were), so no remount is needed here for it.
+ 	}
+ 
+ 	// ── TPM2 enrolment ────────────────────────────────────────────────────────
+diff --git a/fisherman/cmd/fisherman/main_test.go b/fisherman/cmd/fisherman/main_test.go
+index 7419b82..1c47484 100644
+--- a/fisherman/cmd/fisherman/main_test.go
++++ b/fisherman/cmd/fisherman/main_test.go
+@@ -233,3 +233,71 @@ func TestCheckRequiredTools_SystemdCryptenrollNotCheckedForPlainLUKS(t *testing.
+ 		t.Errorf("systemd-cryptenroll should not be checked for luks-passphrase, got: %v", err)
+ 	}
+ }
++
++// TestGptRootRetagPartition covers the regression for the composefs-native
++// boot hang: systemd-gpt-auto-generator has no static root= to fall back on
++// for a "sealed" install, and previously only the unencrypted systemd-boot
++// case was retagged to the Discoverable Partitions Specification root GUID —
++// grub2 and LUKS-encrypted composefs installs silently kept the generic
++// "linux" GPT type and hung on first boot.
++func TestGptRootRetagPartition(t *testing.T) {
++	tests := []struct {
++		name             string
++		isManual         bool
++		isSystemdBoot    bool
++		filesystem       string
++		composeFsBackend bool
++		wantPartNum      int
++		wantOK           bool
++	}{
++		{
++			name:          "systemd-boot composefs unencrypted: partition 2 (regression baseline)",
++			isSystemdBoot: true, composeFsBackend: true,
++			wantPartNum: 2, wantOK: true,
++		},
++		{
++			name:          "grub2 composefs: partition 3, not skipped",
++			isSystemdBoot: false, composeFsBackend: true,
++			wantPartNum: 3, wantOK: true,
++		},
++		{
++			name: "systemd-boot composefs must retag even though bootc caller no longer excludes LUKS: partition 2",
++			// (encryption itself isn't a parameter here — this function no
++			// longer takes hasEncryption at all, which is the fix: the retag
++			// decision must not depend on it.)
++			isSystemdBoot: true, composeFsBackend: true,
++			wantPartNum: 2, wantOK: true,
++		},
++		{
++			name:          "zfs composefs: never retagged (own pool-based root discovery)",
++			isSystemdBoot: true, filesystem: "zfs", composeFsBackend: true,
++			wantPartNum: 0, wantOK: false,
++		},
++		{
++			name:     "manual layout composefs: never retagged (not fisherman's partition to guess)",
++			isManual: true, isSystemdBoot: true, composeFsBackend: true,
++			wantPartNum: 0, wantOK: false,
++		},
++		{
++			name:          "non-composefs: never retagged (has a real UUID-based root=)",
++			isSystemdBoot: true, composeFsBackend: false,
++			wantPartNum: 0, wantOK: false,
++		},
++		{
++			name:          "grub2 non-composefs: never retagged",
++			isSystemdBoot: false, composeFsBackend: false,
++			wantPartNum: 0, wantOK: false,
++		},
++	}
++	for _, tt := range tests {
++		t.Run(tt.name, func(t *testing.T) {
++			gotPartNum, gotOK := gptRootRetagPartition(tt.isManual, tt.isSystemdBoot, tt.filesystem, tt.composeFsBackend)
++			if gotOK != tt.wantOK {
++				t.Fatalf("ok = %v, want %v", gotOK, tt.wantOK)
++			}
++			if gotOK && gotPartNum != tt.wantPartNum {
++				t.Errorf("partNum = %d, want %d", gotPartNum, tt.wantPartNum)
++			}
++		})
++	}
++}
+diff --git a/fisherman/internal/disk/partition.go b/fisherman/internal/disk/partition.go
+index 91a40be..cbf83ac 100644
+--- a/fisherman/internal/disk/partition.go
++++ b/fisherman/internal/disk/partition.go
+@@ -18,7 +18,30 @@ import (
+ // procMountsPath is the path to the mounts file. Overridden in tests.
+ var procMountsPath = "/proc/mounts"
+ 
+-const GPTPartTypeLinuxRootX86_64 = "4f68bce3-e8cd-4db1-96e7-fbcaf984b709"
++// Discoverable Partitions Specification "Linux root" type GUIDs. The generic
++// "linux" shorthand sfdisk writes (0fc63daf-8483-4772-8e79-3d69d8477de4,
++// filesystem type "Linux filesystem data") is NOT one of these — it tells
++// systemd-gpt-auto-generator nothing about which partition is root, on any
++// architecture, encrypted or not. Composefs-native/sealed images boot without
++// a static root= kernel argument (the disk is partitioned at install time, so
++// no UUID is known at image-build time) and rely entirely on
++// systemd-gpt-auto-generator finding a partition tagged with one of these
++// GUIDs.
++const (
++	GPTPartTypeLinuxRootX86_64 = "4f68bce3-e8cd-4db1-96e7-fbcaf984b709"
++	GPTPartTypeLinuxRootARM64  = "b921b045-1df0-41c3-af44-4c6f280d3fae"
++)
++
++// GPTPartTypeLinuxRootForArch returns the Discoverable Partitions
++// Specification root GUID for goarch (a runtime.GOARCH value). Defaults to
++// the x86_64 GUID for any architecture other than arm64, matching this
++// installer's only other supported target.
++func GPTPartTypeLinuxRootForArch(goarch string) string {
++	if goarch == "arm64" {
++		return GPTPartTypeLinuxRootARM64
++	}
++	return GPTPartTypeLinuxRootX86_64
++}
+ 
+ // GetProcMountsPath returns the current mounts file path. For testing only.
+ func GetProcMountsPath() string { return procMountsPath }
+diff --git a/fisherman/internal/disk/partition_test.go b/fisherman/internal/disk/partition_test.go
+index 339b1b4..54b46fb 100644
+--- a/fisherman/internal/disk/partition_test.go
++++ b/fisherman/internal/disk/partition_test.go
+@@ -588,3 +588,28 @@ func containsArg(args []string, target string) bool {
+ 	}
+ 	return false
+ }
++
++// TestGPTPartTypeLinuxRootForArch verifies the Discoverable Partitions
++// Specification root GUID is selected per architecture, not hardcoded to
++// x86_64 for every install (e.g. an arm64 target previously would have been
++// retagged with the wrong GUID, defeating GPT auto-discovery just the same
++// as not retagging at all).
++func TestGPTPartTypeLinuxRootForArch(t *testing.T) {
++	tests := []struct {
++		goarch string
++		want   string
++	}{
++		{"amd64", disk.GPTPartTypeLinuxRootX86_64},
++		{"arm64", disk.GPTPartTypeLinuxRootARM64},
++		{"", disk.GPTPartTypeLinuxRootX86_64},    // unknown/unset: x86_64 default
++		{"386", disk.GPTPartTypeLinuxRootX86_64}, // unsupported arch: x86_64 default, not a panic
++	}
++	for _, tt := range tests {
++		if got := disk.GPTPartTypeLinuxRootForArch(tt.goarch); got != tt.want {
++			t.Errorf("GPTPartTypeLinuxRootForArch(%q) = %q, want %q", tt.goarch, got, tt.want)
++		}
++	}
++	if disk.GPTPartTypeLinuxRootX86_64 == disk.GPTPartTypeLinuxRootARM64 {
++		t.Fatal("x86_64 and arm64 root GUIDs must differ")
++	}
++}
