@@ -103,6 +103,15 @@ podman-chroot 'rm -rf /usr/lib/subsystem/rootfs/rootfs.dsk /usr/lib/flatpak-sysa
 podman-chroot 'cp /app/files/recipe.json /etc/bootc-installer/recipe.json'
 podman-chroot "sed -i 's/TAG/stable-${ISO_NAME#*-}/g' /etc/bootc-installer/recipe.json"
 
+# adjust recipe per-image
+if [[ "$ISO_NAME" == *saffron || "$ISO_NAME" == *maraska ]]; then
+    podman-chroot "sed -i 's/BLDR/systemd/g' /etc/bootc-installer/recipe.json"
+    podman-chroot "sed -i 's/CFS/true/g' /etc/bootc-installer/recipe.json"
+else
+    podman-chroot "sed -i 's/BLDR/systemd/g' /etc/bootc-installer/recipe.json"
+    podman-chroot "sed -i 's/CFS/true/g' /etc/bootc-installer/recipe.json"
+fi
+
 # disable udiskie, automounting is problematic
 podman-chroot 'systemctl --global disable udiskie.service'
 

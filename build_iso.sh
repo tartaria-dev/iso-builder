@@ -47,7 +47,7 @@ ln -sf ../run/systemd/resolve/stub-resolv.conf $SQUASHFS_CTR_IMG_ROOTFS/etc/reso
 kver=$(find $SQUASHFS_CTR_IMG_ROOTFS/usr/lib/modules -maxdepth 1 -printf "%P" | head -1)
 cp $SQUASHFS_CTR_IMG_ROOTFS/live-initramfs.img iso_files/boot/initramfs.img
 rm -f $SQUASHFS_CTR_IMG_ROOTFS/live-initramfs.img
-if [[ "$ISO_NAME" == *mahleb || "$ISO_NAME" == *saffron ]]; then
+if [[ "$ISO_NAME" == *saffron || "$ISO_NAME" == *maraska ]]; then
   cp $SQUASHFS_CTR_IMG_ROOTFS/usr/share/split-kernel/$kver/vmlinuz iso_files/boot/vmlinuz
   rm -rf $SQUASHFS_CTR_IMG_ROOTFS/usr/share/split-kernel
 else
