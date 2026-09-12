@@ -108,8 +108,8 @@ if [[ "$ISO_NAME" == *saffron || "$ISO_NAME" == *maraska ]]; then
     podman-chroot "sed -i 's/BLDR/systemd/g' /etc/bootc-installer/recipe.json"
     podman-chroot "sed -i 's/CFS/true/g' /etc/bootc-installer/recipe.json"
 else
-    podman-chroot "sed -i 's/BLDR/systemd/g' /etc/bootc-installer/recipe.json"
-    podman-chroot "sed -i 's/CFS/true/g' /etc/bootc-installer/recipe.json"
+    podman-chroot "sed -i 's/BLDR/grub2/g' /etc/bootc-installer/recipe.json"
+    podman-chroot "sed -i 's/CFS/false/g' /etc/bootc-installer/recipe.json"
 fi
 
 # disable udiskie, automounting is problematic
