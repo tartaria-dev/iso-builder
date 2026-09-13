@@ -1,7 +1,7 @@
 {
   "log_file": "/tmp/bootc-installer.log",
   "distro_name": "Tartaria",
-  "distro_logo": "distributor-logo-tartaria",
+  "distro_logo": "resource:///org/bootcinstaller/Installer/images/tartaria.svg",
   "imgref": "ghcr.io/tartaria-dev/tartaria:TAG",
   "hostname": "tartarbox",
   "selinuxDisabled": false,

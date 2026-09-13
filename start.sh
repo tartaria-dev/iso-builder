@@ -78,6 +78,7 @@ sudo mkdir -p $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/local/bin
 
 # clone bootc-installer and install it
 podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules -b latest-dev --depth 1 https://github.com/tuna-os/bootc-installer /buildhome/bootc-installer"'
+podman-chroot 'cd /buildhome/bootc-installer && cp /usr/share/pixmaps/tartaria-logo.svg bootc_installer/assets/tartaria-logo.svg && sed -i "/<file>assets\/unsupported.svg<\/file>/a\\    <file preprocess=\"xml-stripblanks\" alias=\"images/tartaria-logo.svg\">assets/tartaria-logo.svg</file>" bootc_installer/bootc-installer.gresource.xml'
 podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && git apply /app/patches/bc*.patch && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
 
 # clone fisherman and install it to /usr/local/bin/fisherman, replaces /usr/bin/fisherman installed by bootc-installer
