@@ -1,0 +1,119 @@
+diff --git a/fisherman/cmd/fisherman/main.go b/fisherman/cmd/fisherman/main.go
+index d6b3bcb..eec6b81 100644
+--- a/fisherman/cmd/fisherman/main.go
++++ b/fisherman/cmd/fisherman/main.go
+@@ -457,6 +457,13 @@ func main() {
+ 			if err := disk.PartitionSystemdBoot(r.Disk); err != nil {
+ 				fatal("partitioning disk: %v", err)
+ 			}
++		} else if r.ComposeFsBackend {
++			// grub2 + composefs: same 3-partition layout (encrypted or not), but
++			// root carries the DPS root type so GPT auto-discovery works for a
++			// sealed image with no root= (see PartitionGrub2Composefs).
++			if err := disk.PartitionGrub2Composefs(r.Disk); err != nil {
++				fatal("partitioning disk: %v", err)
++			}
+ 		} else if hasEncryption {
+ 			if err := disk.PartitionEncrypted(r.Disk); err != nil {
+ 				fatal("partitioning disk: %v", err)
+diff --git a/fisherman/internal/disk/partition.go b/fisherman/internal/disk/partition.go
+index a735517..838d6c5 100644
+--- a/fisherman/internal/disk/partition.go
++++ b/fisherman/internal/disk/partition.go
+@@ -135,14 +135,35 @@ func SetPartitionType(disk string, partNum int, partType string) error {
+ // BLKRRPART; we work around this by detaching and re-attaching the loop
+ // device with --partscan so the kernel creates /dev/loopNpM nodes.
+ func Partition(disk string) error {
+-	script := strings.Join([]string{
++	return partition(disk, grub2Script("linux"))
++}
++
++// grub2Script is the three-partition sfdisk script shared by Partition and
++// PartitionGrub2Composefs; rootType is the sfdisk type for the root partition.
++func grub2Script(rootType string) string {
++	return strings.Join([]string{
+ 		"label: gpt",
+ 		"",
+ 		`size=2GiB, type=uefi, name="EFI-SYSTEM"`,
+ 		`size=2GiB,   type=linux, name="boot"`,
+-		`type=linux, name="root"`,
++		fmt.Sprintf(`type=%s, name="root"`, rootType),
+ 	}, "\n") + "\n"
+-	return partition(disk, script)
++}
++
++// PartitionGrub2Composefs wipes disk and creates the same three-partition
++// layout as Partition, but with the root (p3) carrying the architecture's DPS
++// root type from the start.
++//
++// Sealed composefs images boot without a static root= argument (the disk is
++// partitioned at install time, so no UUID is known at image-build time), so
++// grub2 needs GPT auto-discovery just as much as systemd-boot does (#219) —
++// plain or LUKS-wrapped, since the initrd locates the LUKS container itself by
++// this type. Setting it here rather than retagging after the install also
++// covers the encrypted case, where the raw partition is hidden behind the LUKS
++// mapping. Ostree (non-composefs) grub2 installs keep the generic "linux" type
++// via Partition: they carry an explicit root=UUID and need no discovery.
++func PartitionGrub2Composefs(disk string) error {
++	return partition(disk, grub2Script(LinuxRootPartType()))
+ }
+ 
+ // PartitionEncrypted wipes disk and creates the same three-partition GPT
+diff --git a/fisherman/internal/disk/partition_test.go b/fisherman/internal/disk/partition_test.go
+index 1d2352e..34f0ce0 100644
+--- a/fisherman/internal/disk/partition_test.go
++++ b/fisherman/internal/disk/partition_test.go
+@@ -313,6 +313,53 @@ func TestPartitionSystemdBoot_SfdiskScript(t *testing.T) {
+ 	}
+ }
+ 
++// TestPartitionGrub2Composefs_SfdiskScript verifies the grub2+composefs layout
++// is the same 3-partition layout as Partition but with the root typed as the
++// DPS root, so sealed (no root=) images are discoverable by gpt-auto-generator.
++// Partition itself must keep the generic linux type for ostree installs.
++func TestPartitionGrub2Composefs_SfdiskScript(t *testing.T) {
++	recPlain := setupRecorder(t)
++	if err := disk.Partition("/dev/sda"); err != nil {
++		t.Fatalf("Partition: %v", err)
++	}
++	plain := sfdiskStdin(t, recPlain)
++
++	rec := setupRecorder(t)
++	if err := disk.PartitionGrub2Composefs("/dev/sda"); err != nil {
++		t.Fatalf("PartitionGrub2Composefs: %v", err)
++	}
++	script := sfdiskStdin(t, rec)
++
++	var lines, plainLines []string
++	for _, l := range strings.Split(script, "\n") {
++		if l = strings.TrimSpace(l); l != "" && !strings.HasPrefix(l, "label:") {
++			lines = append(lines, l)
++		}
++	}
++	for _, l := range strings.Split(plain, "\n") {
++		if l = strings.TrimSpace(l); l != "" && !strings.HasPrefix(l, "label:") {
++			plainLines = append(plainLines, l)
++		}
++	}
++	if len(lines) != 3 {
++		t.Fatalf("expected 3 partition lines, got %d:\n%s", len(lines), script)
++	}
++	// EFI and /boot are unchanged from Partition.
++	if lines[0] != plainLines[0] || lines[1] != plainLines[1] {
++		t.Errorf("EFI//boot lines differ from Partition:\ncomposefs: %q\nplain:     %q", lines[:2], plainLines[:2])
++	}
++	if !strings.Contains(lines[2], "type="+disk.LinuxRootPartType()) {
++		t.Errorf("root (p3) missing type=%s: %q", disk.LinuxRootPartType(), lines[2])
++	}
++	if strings.Contains(lines[2], "size=") {
++		t.Errorf("root should fill remaining space (no size=): %q", lines[2])
++	}
++	// Partition must stay generic-linux for non-composefs grub2 installs.
++	if !strings.Contains(plainLines[2], "type=linux,") {
++		t.Errorf("Partition root should keep type=linux, got %q", plainLines[2])
++	}
++}
++
+ // TestLinuxRootPartType pins the DPS root GUID to the build architecture.
+ func TestLinuxRootPartType(t *testing.T) {
+ 	got := disk.LinuxRootPartType()

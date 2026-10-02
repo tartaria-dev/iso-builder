@@ -1,5 +1,5 @@
 diff --git a/bootc_installer/defaults/slurp.py b/bootc_installer/defaults/slurp.py
-index 61a112ce..261b638d 100644
+index 944c53cd..1bef0cb8 100644
 --- a/bootc_installer/defaults/slurp.py
 +++ b/bootc_installer/defaults/slurp.py
 @@ -199,7 +199,7 @@ class BootcDefaultSlurp(Adw.Bin):
@@ -11,19 +11,56 @@ index 61a112ce..261b638d 100644
  
          try:
              result = subprocess.run(
-diff --git a/bootc_installer/views/progress.py b/bootc_installer/views/progress.py
-index 1b82ee8f..4c084737 100644
---- a/bootc_installer/views/progress.py
-+++ b/bootc_installer/views/progress.py
-@@ -72,10 +72,8 @@ def _fisherman_argv_direct(recipe: str) -> list:
+diff --git a/bootc_installer/utils/fisherman_runner.py b/bootc_installer/utils/fisherman_runner.py
+index 85d473c8..e7382ecb 100644
+--- a/bootc_installer/utils/fisherman_runner.py
++++ b/bootc_installer/utils/fisherman_runner.py
+@@ -42,10 +42,9 @@ def build_argv(
          else:
-             cmd = f'pkexec "{_FISHERMAN_HOST_PATH}" "$1" >"{log}" 2>&1; exit $?'
-         return ["flatpak-spawn", "--host", "bash", "-c", cmd, "--", recipe]
--    elif _LIVE_ISO:
--        return ["bash", "-c", f'sudo /usr/local/bin/fisherman "$1" >"{log}" 2>&1; exit $?', "--", recipe]
-     else:
--        return ["bash", "-c", f'pkexec /usr/local/bin/fisherman "$1" >"{log}" 2>&1; exit $?', "--", recipe]
-+        return ["bash", "-c", f'sudo /usr/local/bin/fisherman "$1" >"{log}" 2>&1; exit $?', "--", recipe]
+             command = f'pkexec "{host_path}" "$1" >"{log_path}" 2>&1; exit $?'
+         return ["flatpak-spawn", "--host", "bash", "-c", command, "--", recipe]
+-    if live_iso:
+-        command = f'sudo /usr/local/bin/fisherman "$1" >"{log_path}" 2>&1; exit $?'
+-    else:
+-        command = f'pkexec /usr/local/bin/fisherman "$1" >"{log_path}" 2>&1; exit $?'
++    # sudo is used on every native (non-Flatpak) path, not just the live ISO.
++    # `live_iso` is kept in the signature for caller compatibility.
++    command = f'sudo /usr/local/bin/fisherman "$1" >"{log_path}" 2>&1; exit $?'
+     return ["bash", "-c", command, "--", recipe]
  
  
- def _path_is_private(path: str, check_mode: bool = True) -> bool:
+diff --git a/tests/unit/test_fisherman_runner.py b/tests/unit/test_fisherman_runner.py
+index d79c61a4..75f5498a 100644
+--- a/tests/unit/test_fisherman_runner.py
++++ b/tests/unit/test_fisherman_runner.py
+@@ -6,7 +6,7 @@ from unittest.mock import patch
+ from bootc_installer.utils import fisherman_runner
+ 
+ 
+-def test_native_argv_uses_pkexec_and_preserves_recipe_argument():
++def test_native_argv_uses_sudo_and_preserves_recipe_argument():
+     argv = fisherman_runner.build_argv(
+         "/tmp/recipe.json",
+         in_flatpak=False,
+@@ -15,7 +15,7 @@ def test_native_argv_uses_pkexec_and_preserves_recipe_argument():
+     )
+ 
+     assert argv[-1] == "/tmp/recipe.json"
+-    assert "pkexec /usr/local/bin/fisherman" in argv[argv.index("-c") + 1]
++    assert "sudo /usr/local/bin/fisherman" in argv[argv.index("-c") + 1]
+ 
+ 
+ def test_flatpak_argv_runs_redirect_on_host():
+diff --git a/tests/unit/test_progress.py b/tests/unit/test_progress.py
+index c9cb13ed..932ec083 100644
+--- a/tests/unit/test_progress.py
++++ b/tests/unit/test_progress.py
+@@ -105,7 +105,7 @@ class TestFishermanArgvDirect(unittest.TestCase):
+         argv = fn("/tmp/recipe.json")
+         self.assertEqual(argv[0], "bash")
+         script = self._script(argv)
+-        self.assertIn("pkexec", script)
++        self.assertIn("sudo", script)
+         self.assertIn("/usr/local/bin/fisherman", script)
+         self.assertEqual(argv[-1], "/tmp/recipe.json")
+ 
