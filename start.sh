@@ -77,12 +77,12 @@ sudo rm -f $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/local
 sudo mkdir -p $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/local/bin
 
 # clone bootc-installer and install it
-podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules -b latest-dev --depth 1 --revision f1f62e464dc2ab6dfac61267c63f2245b7049bed https://github.com/tuna-os/bootc-installer /buildhome/bootc-installer"'
+podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules --depth 1 --revision f1f62e464dc2ab6dfac61267c63f2245b7049bed https://github.com/tuna-os/bootc-installer /buildhome/bootc-installer"'
 podman-chroot 'cd /buildhome/bootc-installer && cp /usr/share/pixmaps/tartaria-logo.svg bootc_installer/assets/tartaria-logo.svg && sed -i "/<file>assets\/unsupported.svg<\/file>/a\\    <file preprocess=\"xml-stripblanks\" alias=\"images/tartaria-logo.svg\">assets/tartaria-logo.svg</file>" bootc_installer/bootc-installer.gresource.xml'
 podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && git apply /app/patches/bc*.patch && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
 
 # clone fisherman and install it to /usr/local/bin/fisherman, replaces /usr/bin/fisherman installed by bootc-installer
-podman-chroot 'runuser -u builder -- bash -c "git clone --quiet -b dev --depth 1 --revision 5a98ec827fa370d48da69ecf4af3200f20980ce2 https://github.com/tuna-os/fisherman /buildhome/fisherman && cd /buildhome/fisherman && git apply /app/patches/fm*.patch"'
+podman-chroot 'runuser -u builder -- bash -c "git clone --quiet --depth 1 --revision 5a98ec827fa370d48da69ecf4af3200f20980ce2 https://github.com/tuna-os/fisherman /buildhome/fisherman && cd /buildhome/fisherman && git apply /app/patches/fm*.patch"'
 podman-chroot 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman && GOCACHE=/buildhome/gocache GOPATH=/buildhome/gopath GOPROXY=off go build -o /buildhome/fisherman/fisherman-bin ./cmd/fisherman && sudo install -Dm755 /buildhome/fisherman/fisherman-bin /usr/local/bin/fisherman"'
 sudo rm -f $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/bin/fisherman
 
