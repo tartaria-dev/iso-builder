@@ -1,0 +1,213 @@
+diff --git a/fisherman/cmd/fisherman/main.go b/fisherman/cmd/fisherman/main.go
+index d6b3bcb..2e78b70 100644
+--- a/fisherman/cmd/fisherman/main.go
++++ b/fisherman/cmd/fisherman/main.go
+@@ -708,6 +708,11 @@ func main() {
+ 		if err := install.InstallSystemdBoot(activeTargetMount); err != nil {
+ 			progress.Info(fmt.Sprintf("Warning: could not ensure systemd-boot EFI binary: %v", err))
+ 		}
++		// Let the image replace the ESP bootloader files with its own (e.g. a
++		// shim + signed systemd-boot chain). No-op when it ships none.
++		if err := install.InstallEFIPayload(activeTargetMount, r.Image); err != nil {
++			progress.Info(fmt.Sprintf("Warning: could not install image EFI payload: %v", err))
++		}
+ 	}
+ 
+ 	// systemd-boot composefs installs rely on GPT auto-discovery for the root
+diff --git a/fisherman/internal/install/efipayload.go b/fisherman/internal/install/efipayload.go
+new file mode 100644
+index 0000000..7a19812
+--- /dev/null
++++ b/fisherman/internal/install/efipayload.go
+@@ -0,0 +1,106 @@
++package install
++
++import (
++	"bytes"
++	"fmt"
++	"io/fs"
++	"os"
++	"path/filepath"
++	"strings"
++
++	"github.com/tuna-os/fisherman/internal/progress"
++)
++
++// efiPayloadDir is where an image can ship an overlay for the ESP. The
++// directory mirrors the ESP layout, e.g.
++//
++//	/usr/lib/fisherman/efi/EFI/BOOT/BOOTX64.EFI   (shim)
++//	/usr/lib/fisherman/efi/EFI/BOOT/mmx64.efi
++//	/usr/lib/fisherman/efi/EFI/BOOT/grubx64.efi   (signed systemd-boot)
++//
++// Images that need a Secure Boot chain other than "signed systemd-boot
++// verified directly by firmware" (for example shim + MOK) use this so the
++// bootloader files bootctl wrote are replaced with the image's own.
++const efiPayloadDir = "/usr/lib/fisherman/efi"
++
++// InstallEFIPayload copies the image's ESP overlay (efiPayloadDir) onto the
++// target ESP, overwriting files bootctl or InstallSystemdBoot put there. It is
++// a no-op when the image ships no payload.
++func InstallEFIPayload(targetMount, imageRef string) error {
++	efiDir := filepath.Join(targetMount, "boot", "efi")
++
++	stage, err := os.MkdirTemp("", "fisherman-efi-")
++	if err != nil {
++		return fmt.Errorf("creating staging dir: %w", err)
++	}
++	defer os.RemoveAll(stage)
++
++	name := fmt.Sprintf("fisherman-efi-%d", os.Getpid())
++	if err := Exec.Command("podman", "create", "--name", name, bareImageRef(imageRef)).Run(); err != nil {
++		return fmt.Errorf("podman create %s: %w", imageRef, err)
++	}
++	defer func() { _ = Exec.Command("podman", "rm", "-f", name).Run() }()
++
++	var stderr bytes.Buffer
++	cp := Exec.Command("podman", "cp", name+":"+efiPayloadDir+"/.", stage)
++	cp.SetStderr(&stderr)
++	if err := cp.Run(); err != nil {
++		if isNoSuchPath(stderr.String()) {
++			progress.Info("image ships no EFI payload, leaving ESP as installed")
++			return nil
++		}
++		return fmt.Errorf("podman cp %s: %w: %s", efiPayloadDir, err, strings.TrimSpace(stderr.String()))
++	}
++
++	n, err := copyTree(stage, efiDir)
++	if err != nil {
++		return err
++	}
++	if n == 0 {
++		progress.Info("EFI payload directory is empty, leaving ESP as installed")
++		return nil
++	}
++	progress.Info(fmt.Sprintf("Installed %d EFI payload file(s) from the image onto the ESP", n))
++	return nil
++}
++
++// isNoSuchPath reports whether podman cp's stderr says the source path is
++// absent from the container (as opposed to a real failure).
++func isNoSuchPath(stderr string) bool {
++	s := strings.ToLower(stderr)
++	return strings.Contains(s, "no such file") || strings.Contains(s, "could not find")
++}
++
++// copyTree copies regular files from src onto dst, creating directories and
++// overwriting existing files. Symlinks and other special files are skipped.
++// It returns the number of files copied.
++func copyTree(src, dst string) (int, error) {
++	count := 0
++	err := filepath.WalkDir(src, func(path string, d fs.DirEntry, walkErr error) error {
++		if walkErr != nil {
++			return walkErr
++		}
++		rel, err := filepath.Rel(src, path)
++		if err != nil {
++			return err
++		}
++		if rel == "." {
++			return nil
++		}
++		target := filepath.Join(dst, rel)
++		switch {
++		case d.IsDir():
++			return os.MkdirAll(target, 0o755)
++		case d.Type().IsRegular():
++			if err := os.MkdirAll(filepath.Dir(target), 0o755); err != nil {
++				return err
++			}
++			if err := copyFile(path, target); err != nil {
++				return fmt.Errorf("copying %s: %w", rel, err)
++			}
++			count++
++		}
++		return nil
++	})
++	return count, err
++}
+diff --git a/fisherman/internal/install/efipayload_test.go b/fisherman/internal/install/efipayload_test.go
+new file mode 100644
+index 0000000..c1873a0
+--- /dev/null
++++ b/fisherman/internal/install/efipayload_test.go
+@@ -0,0 +1,79 @@
++package install
++
++import (
++	"os"
++	"path/filepath"
++	"testing"
++)
++
++func TestIsNoSuchPath(t *testing.T) {
++	for _, s := range []string{
++		"Error: copying from container: no such file or directory",
++		"Error: could not find /usr/lib/fisherman/efi in container",
++	} {
++		if !isNoSuchPath(s) {
++			t.Errorf("isNoSuchPath(%q) = false, want true", s)
++		}
++	}
++	if isNoSuchPath("Error: permission denied") {
++		t.Error("isNoSuchPath(permission denied) = true, want false")
++	}
++}
++
++func TestCopyTree_OverwritesAndSkipsSymlinks(t *testing.T) {
++	src, dst := t.TempDir(), t.TempDir()
++	write := func(root, rel, data string) {
++		p := filepath.Join(root, rel)
++		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
++			t.Fatal(err)
++		}
++		if err := os.WriteFile(p, []byte(data), 0o644); err != nil {
++			t.Fatal(err)
++		}
++	}
++	write(src, "EFI/BOOT/BOOTX64.EFI", "shim")
++	write(src, "EFI/BOOT/mmx64.efi", "mm")
++	write(dst, "EFI/BOOT/BOOTX64.EFI", "unsigned-sd-boot")
++	write(dst, "EFI/systemd/systemd-bootx64.efi", "keep")
++	if err := os.Symlink("/etc/passwd", filepath.Join(src, "EFI", "BOOT", "link.efi")); err != nil {
++		t.Fatal(err)
++	}
++
++	n, err := copyTree(src, dst)
++	if err != nil {
++		t.Fatalf("copyTree: %v", err)
++	}
++	if n != 2 {
++		t.Errorf("copied %d files, want 2", n)
++	}
++	got, _ := os.ReadFile(filepath.Join(dst, "EFI/BOOT/BOOTX64.EFI"))
++	if string(got) != "shim" {
++		t.Errorf("BOOTX64.EFI = %q, want overwritten with %q", got, "shim")
++	}
++	if _, err := os.Stat(filepath.Join(dst, "EFI/BOOT/link.efi")); err == nil {
++		t.Error("symlink was copied, want skipped")
++	}
++	if b, _ := os.ReadFile(filepath.Join(dst, "EFI/systemd/systemd-bootx64.efi")); string(b) != "keep" {
++		t.Error("unrelated ESP file was modified")
++	}
++}
++
++// With no payload files staged the function must succeed and touch nothing,
++// and it must always clean up the temporary container.
++func TestInstallEFIPayload_EmptyPayloadIsNoop(t *testing.T) {
++	mock := setupInstallMockExec(t)
++	target := t.TempDir()
++
++	if err := InstallEFIPayload(target, "containers-storage:ghcr.io/x/y:latest"); err != nil {
++		t.Fatalf("InstallEFIPayload: %v", err)
++	}
++	if len(mock.calls) != 3 {
++		t.Fatalf("expected create, cp, rm; got %v", mock.calls)
++	}
++	if mock.calls[0].args[0] != "create" || mock.calls[0].args[3] != "ghcr.io/x/y:latest" {
++		t.Errorf("create args = %v (transport prefix should be stripped)", mock.calls[0].args)
++	}
++	if mock.calls[1].args[0] != "cp" || mock.calls[2].args[0] != "rm" {
++		t.Errorf("unexpected call order: %v", mock.calls)
++	}
++}
