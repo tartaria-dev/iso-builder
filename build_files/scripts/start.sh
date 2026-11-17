@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
 
+### set errexit + pipefail + nounset + xtrace
+
+set -ouex pipefail
+
+### set constants
+
 _SCRIPTDIR=$(dirname "$0")
 SQUASHFS_CTR_IMG=${1:-$SQUASHFS_CTR_IMG}
 OUT_DIR=${2:-./out}
 ISO_NAME=${3:-${ISO_NAME:-tartaria}}
+
+### do our checks
 
 if [ "$EUID" -ne 0 ]; then
   echo "This script must be ran as root."
@@ -16,22 +24,34 @@ elif ! which podman rsync &>/dev/null; then
   exit 1
 fi
 
-set -ouex pipefail
+### utilities
 
-# These 2 functions help group sections in github's CI
-function github-step() {
-  set -euo pipefail
-  local command="$*"
-  echo "::group::$*"
-}
-function github-step-end() {
-  echo "::endgroup::"
+github-step() {
+    set -euo pipefail
+    local command="$*"
+    echo "::group::$*"
 }
 
+github-step-end() {
+    echo "::endgroup::"
+}
 
 fail_invalid_image() {
-  echo -e "\nThe image \"${SQUASHFS_CTR_IMG}\" failed to be pulled."
-  exit 1
+    echo -e "\nThe image \"${SQUASHFS_CTR_IMG}\" failed to be pulled."
+    exit 1
+}
+
+podman-chroot(){
+    set -euo pipefail
+    local command="$1"
+    podman run --rm -it --privileged \
+        --no-hostname --no-hosts \
+        --security-opt label=type:unconfined_t \
+        --tmpfs /tmp:rw \
+        --tmpfs /run:rw \
+        --volume $_SCRIPTDIR:/app \
+        --rootfs $SQUASHFS_CTR_IMAGE_MOUNTPOINT \
+        /usr/bin/bash -c "$command"
 }
 
 # Make sure the image exists. If not, pull it
@@ -42,19 +62,6 @@ CONTAINER_ID=$(podman create "${SQUASHFS_CTR_IMG}")
 trap "echo -e 'Cleaning up podman images\n' && podman rm -f ${CONTAINER_ID}" EXIT
 SQUASHFS_CTR_IMAGE_MOUNTPOINT=$(podman mount ${CONTAINER_ID})
 
-# podman-chroot function to run commands within the OCI
-function podman-chroot(){
-  set -euo pipefail
-  local command="$1"
-  podman run --rm -it --privileged \
-    --no-hostname --no-hosts \
-    --security-opt label=type:unconfined_t \
-    --tmpfs /tmp:rw \
-    --tmpfs /run:rw \
-    --volume $_SCRIPTDIR:/app \
-    --rootfs $SQUASHFS_CTR_IMAGE_MOUNTPOINT \
-    /usr/bin/bash -c "$command"
-}
 
 github-step "System Setup"
 
