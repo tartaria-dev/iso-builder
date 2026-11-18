@@ -1,34 +1,43 @@
 #!/usr/bin/env bash
 
-### set errexit + pipefail + nounset + xtrace
+### set errexit + nounset + xtrace + pipefail
 
-set -ouex pipefail
-
-### set constants
-
-_SCRIPTDIR=$(dirname "$0")
-SQUASHFS_CTR_IMG=${1:-$SQUASHFS_CTR_IMG}
-OUT_DIR=${2:-./out}
-ISO_NAME=${3:-${ISO_NAME:-tartaria}}
+set -euxo pipefail
 
 ### do our checks
 
-if [ "$EUID" -ne 0 ]; then
-  echo "This script must be ran as root."
-  exit 1
-elif [ -z $1 ] && [ -z $SQUASHFS_CTR_IMG ]; then
-  echo -e "You need to specify an OCI image.\nExample: ${0} docker.io/archlinux/archlinux:latest"
-  exit 1
+if [[ "$EUID" -ne 0 ]]; then
+    echo "This script must be ran as root."
+    exit 1
+elif [[ -z ${1:-} ]]; then
+    echo -e "You need to specify an OCI image.\nExample: docker.io/archlinux/archlinux:latest"
+    exit 1
+elif [[ -z ${2:-} ]]; then
+    echo -e "You need to specify an output directory.\nExample: ./out"
+    exit 1
+elif [[ -z ${3:-} ]]; then
+    echo -e "You need to specify an ISO name.\nExample: latest-stable"
+    exit 1
 elif ! which podman rsync &>/dev/null; then
-  echo -e "This script requires both podman and rsync to run. Please install the missing packages via your system's package manager, and then run this script again."
-  exit 1
+    echo -e "This script requires both podman and rsync to run. Please install the missing packages via your system's package manager, and then run this script again."
+    exit 1
 fi
+
+### set global vars
+
+squashfs_ctr_img=$1
+
+### set constants
+
+REPO_DIR=$(dirname "$0")/../..
+OUT_DIR=$2
+ISO_NAME=$3
+
+readonly {REPO,OUT}_DIR ISO_NAME
 
 ### utilities
 
 gstep_start() {
-    local command="$*"
-
     echo "::group::$*"
 }
 
@@ -37,7 +46,7 @@ gstep_end() {
 }
 
 fail_invalid_image() {
-    echo -e "\nThe image \"${SQUASHFS_CTR_IMG}\" failed to be pulled."
+    echo -e "\nThe image \"${squashfs_ctr_img}\" failed to be pulled."
     exit 1
 }
 
@@ -49,8 +58,8 @@ ctr_exec(){
         --security-opt label=type:unconfined_t \
         --tmpfs /tmp:rw \
         --tmpfs /run:rw \
-        --volume $_SCRIPTDIR:/app \
-        --rootfs $SQUASHFS_CTR_IMAGE_MOUNTPOINT \
+        --volume "$REPO_DIR":/app \
+        --rootfs "$container_mntpoint" \
         /usr/bin/bash -c "$command"
 }
 
@@ -59,13 +68,13 @@ ctr_exec(){
 iso_container_create() {
     gstep_start "Pull/Create Tartaria container from GHCR"
 
-    podman image exists "${SQUASHFS_CTR_IMG}" || podman pull "${SQUASHFS_CTR_IMG}" || fail_invalid_image
+    podman image exists "${squashfs_ctr_img}" || podman pull "${squashfs_ctr_img}" || fail_invalid_image
 
-    CONTAINER_ID=$(podman create "${SQUASHFS_CTR_IMG}")
+    container_id=$(podman create "${squashfs_ctr_img}")
 
-    trap 'echo -e "Cleaning up podman images\n" && podman rm -f "${CONTAINER_ID}"' EXIT
+    trap 'echo -e "Cleaning up podman images\n" && podman rm -f "${container_id}"' EXIT
 
-    SQUASHFS_CTR_IMAGE_MOUNTPOINT=$(podman mount ${CONTAINER_ID})
+    container_mntpoint=$(podman mount "${container_id}")
 
     gstep_end
 }
@@ -82,7 +91,7 @@ iso_container_sysconf() {
 
     ctr_exec 'ln -sf /usr/share/zoneinfo/UTC /etc/localtime && mkdir -p /var/tmp'
 
-    rsync -rltDxv $_SCRIPTDIR/system_files/ $SQUASHFS_CTR_IMAGE_MOUNTPOINT/
+    rsync -rltDxv "$REPO_DIR"/system_files/ "$container_mntpoint"/
 
     gstep_end
 }
@@ -106,11 +115,11 @@ iso_container_installconf() {
 
     ctr_exec 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules --depth 1 --revision f1f62e464dc2ab6dfac61267c63f2245b7049bed https://github.com/tuna-os/bootc-installer /buildhome/bootc-installer"'
     ctr_exec 'cd /buildhome/bootc-installer && cp /usr/share/pixmaps/tartaria-logo.svg bootc_installer/assets/tartaria-logo.svg && sed -i "/<file>assets\/unsupported.svg<\/file>/a\\    <file preprocess=\"xml-stripblanks\" alias=\"images/tartaria-logo.svg\">assets/tartaria-logo.svg</file>" bootc_installer/bootc-installer.gresource.xml'
-    ctr_exec 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && git apply /app/patches/bc*.patch && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
+    ctr_exec 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && git apply /app/build_files/patches/bc*.patch && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
 
-    ctr_exec 'runuser -u builder -- bash -c "git clone --quiet --depth 1 --revision 5a98ec827fa370d48da69ecf4af3200f20980ce2 https://github.com/tuna-os/fisherman /buildhome/fisherman && cd /buildhome/fisherman && git apply /app/patches/fm*.patch"'
+    ctr_exec 'runuser -u builder -- bash -c "git clone --quiet --depth 1 --revision 5a98ec827fa370d48da69ecf4af3200f20980ce2 https://github.com/tuna-os/fisherman /buildhome/fisherman && cd /buildhome/fisherman && git apply /app/build_files/patches/fm*.patch"'
     ctr_exec 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman && GOCACHE=/buildhome/gocache GOPATH=/buildhome/gopath GOPROXY=off go build -o /buildhome/fisherman/fisherman-bin ./cmd/fisherman && sudo install -Dm755 /buildhome/fisherman/fisherman-bin /usr/local/bin/fisherman"'
-    sudo rm -f $SQUASHFS_CTR_IMAGE_MOUNTPOINT/usr/bin/fisherman
+    sudo rm -f "$container_mntpoint"/usr/bin/fisherman
 
     ctr_exec 'userdel builder && rm -rf /buildhome /etc/sudoers.d/builder'
     ctr_exec 'pacman -Rns --noconfirm ninja meson blueprint-compiler go'
@@ -144,32 +153,32 @@ iso_container_servconf() {
 
 ### actual iso build stuff
 
-iso_build_loadref() {
+iso_prebuild_loadref() {
     gstep_start "Load Tartaria into container"
 
-    podman unmount ${CONTAINER_ID}
+    podman unmount "$container_id"
 
-    podman commit ${CONTAINER_ID} iso-base:latest
+    podman commit "$container_id" iso-base:latest
 
-    podman rm ${CONTAINER_ID}
-    podman rmi $SQUASHFS_CTR_IMG
+    podman rm "$container_id"
+    podman rmi "$squashfs_ctr_img"
 
-    SQUASHFS_CTR_IMG="iso-base:latest"
-    CONTAINER_ID=$(podman create "${SQUASHFS_CTR_IMG}")
-    SQUASHFS_CTR_IMAGE_MOUNTPOINT=$(podman mount ${CONTAINER_ID})
+    squashfs_ctr_img="iso-base:latest"
+    container_id=$(podman create "$squashfs_ctr_img")
+    container_mntpoint=$(podman mount "$container_id")
 
     ctr_exec "podman pull ghcr.io/tartaria-dev/tartaria:stable-${ISO_NAME#*-}"
 
     gstep_end
 }
 
-iso_build_geninit() {
+iso_prebuild_geninit() {
     gstep_start "Generate container initramfs"
 
     ctr_exec "[ -d /var/roothome ] || mkdir -p /var/roothome"
 
-    ctr_exec 'kver=$(find /usr/lib/modules -maxdepth 1 -printf "%P" | head -1) DRACUT_NO_XATTR=1 && dracut \
-        --kver="$kver" \
+    ctr_exec 'DRACUT_NO_XATTR=1 dracut \
+        --kver="$(find /usr/lib/modules -maxdepth 1 -printf "%P" | head -1)" \
         --zstd \
         --reproducible \
         --no-hostonly \
@@ -179,9 +188,11 @@ iso_build_geninit() {
         --force-drivers "usb_storage uas xhci_pci ahci" \
         --force \
         /live-initramfs.img'
+
+    gstep_end
 }
 
-iso_build_final() {
+iso_prebuild_handoff() {
     ctr_exec "rm -rf /var/tmp/*"
 
     mkdir -p "$OUT_DIR"
@@ -193,12 +204,11 @@ iso_build_final() {
         --security-opt label=type:unconfined_t \
         --env ISO_ENVIRONMENT=true \
         --env GRUB_FILE_PATH=/grub.cfg \
-        --env ISO_NAME="${ISO_NAME}" \
-        --env SQUASHFS_CTR_IMAGE_MOUNTPOINT="${SQUASHFS_CTR_IMAGE_MOUNTPOINT}" \
-        -v "$_SCRIPTDIR"/grub.cfg:/grub.cfg:ro \
-        -v "$_SCRIPTDIR"/build_iso.sh:/build_iso.sh:ro \
+        --env ISO_NAME="$ISO_NAME" \
+        -v "$REPO_DIR"/build_files/config/grub.cfg:/grub.cfg:ro \
+        -v "$REPO_DIR"/build_files/scripts/01-build.sh:/build_iso.sh:ro \
         -v "$OUT_DIR":/out \
-        -v "${SQUASHFS_CTR_IMAGE_MOUNTPOINT}":/rootfs \
+        -v "$container_mntpoint":/rootfs \
         quay.io/fedora/fedora:42 /build_iso.sh
 }
 
@@ -211,9 +221,9 @@ main() {
     iso_container_installconf
     iso_container_servconf
 
-    iso_build_loadref
-    iso_build_geninit
-    iso_build_final
+    iso_prebuild_loadref
+    iso_prebuild_geninit
+    iso_prebuild_handoff
 }
 
 main
