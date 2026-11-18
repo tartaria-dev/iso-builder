@@ -99,7 +99,7 @@ iso_container_sysconf() {
 iso_container_userconf() {
     gstep_start "Create container users"
 
-    ctr_exec 'mkdir -p /var/home && useradd -d /buildhome -U builder && useradd -mUG wheel liveuser && echo 'liveuser:tartaria' | chpasswd'
+    ctr_exec 'mkdir -p /var/home && useradd -d /buildhome -U builder && useradd -mUG wheel liveuser && echo "liveuser:tartaria" | chpasswd'
     ctr_exec 'mkdir -p /etc/sudoers.d && echo "liveuser ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/liveuser && echo "builder ALL=(ALL) NOPASSWD: ALL" > /etc/sudoers.d/builder'
     ctr_exec 'mkdir -p /buildhome && chown builder:builder /buildhome'
 
@@ -178,7 +178,7 @@ iso_prebuild_geninit() {
     ctr_exec "[ -d /var/roothome ] || mkdir -p /var/roothome"
 
     ctr_exec 'DRACUT_NO_XATTR=1 dracut \
-        --kver="$(find /usr/lib/modules -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -n 1)" \
+        --kver="$(find /usr/lib/modules -mindepth 1 -maxdepth 1 -type d -printf "%f\n" | sort -V | tail -n 1)" \
         --zstd \
         --reproducible \
         --no-hostonly \
