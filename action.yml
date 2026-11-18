@@ -1,7 +1,7 @@
 # yaml-language-server: $schema=https://www.schemastore.org/github-action.json
 
 name: "Build Tartaria ISO Action"
-description: "Builds a Tartaria ISO from a container image using the start.sh script."
+description: "Builds a Tartaria ISO from a container image using the 00-start.sh script."
 inputs:
   container-image:
     description: "Container image to use for the squashfs rootfs"

@@ -178,7 +178,7 @@ iso_prebuild_geninit() {
     ctr_exec "[ -d /var/roothome ] || mkdir -p /var/roothome"
 
     ctr_exec 'DRACUT_NO_XATTR=1 dracut \
-        --kver="$(find /usr/lib/modules -maxdepth 1 -printf "%P" | head -1)" \
+        --kver="$(find /usr/lib/modules -mindepth 1 -maxdepth 1 -type d -printf '%f\n' | sort -V | tail -n 1)" \
         --zstd \
         --reproducible \
         --no-hostonly \
