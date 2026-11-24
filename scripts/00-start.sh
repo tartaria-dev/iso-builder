@@ -91,7 +91,13 @@ iso_container_sysconf() {
 
     ctr_exec 'ln -sf /usr/share/zoneinfo/UTC /etc/localtime && mkdir -p /var/tmp'
 
-    rsync -rltDxv "$REPO_DIR"/system_files/ "$container_mntpoint"/
+    rsync -rltDxv "$REPO_DIR"/files/ "$container_mntpoint"/
+
+    if [[ "$ISO_NAME" == *saffron || "$ISO_NAME" == *maraska ]]; then
+        ctr_exec 'cp /app/config/settings.json /usr/share/tartaria/cherries/dot_config/dms/'
+    else
+        ctr_exec 'cp /app/config/settings.toml /usr/share/tartaria/cherries/dot_local/state/noctalia/settings.toml'
+    fi
 
     gstep_end
 }
@@ -115,9 +121,9 @@ iso_container_installconf() {
 
     ctr_exec 'runuser -u builder -- bash -c "git clone --quiet --recurse-submodules --depth 1 --revision f1f62e464dc2ab6dfac61267c63f2245b7049bed https://github.com/tuna-os/bootc-installer /buildhome/bootc-installer"'
     ctr_exec 'cd /buildhome/bootc-installer && cp /usr/share/pixmaps/tartaria-logo.svg bootc_installer/assets/tartaria-logo.svg && sed -i "/<file>assets\/unsupported.svg<\/file>/a\\    <file preprocess=\"xml-stripblanks\" alias=\"images/tartaria-logo.svg\">assets/tartaria-logo.svg</file>" bootc_installer/bootc-installer.gresource.xml'
-    ctr_exec 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && git apply /app/build_files/patches/bc*.patch && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
+    ctr_exec 'runuser -u builder -- bash -c "cd /buildhome/bootc-installer && git apply /app/patches/bc*.patch && meson setup build --prefix=/usr --reconfigure && ninja -C build && sudo ninja -C build install"'
 
-    ctr_exec 'runuser -u builder -- bash -c "git clone --quiet --depth 1 --revision 5a98ec827fa370d48da69ecf4af3200f20980ce2 https://github.com/tuna-os/fisherman /buildhome/fisherman && cd /buildhome/fisherman && git apply /app/build_files/patches/fm*.patch"'
+    ctr_exec 'runuser -u builder -- bash -c "git clone --quiet --depth 1 --revision 5a98ec827fa370d48da69ecf4af3200f20980ce2 https://github.com/tuna-os/fisherman /buildhome/fisherman && cd /buildhome/fisherman && git apply /app/patches/fm*.patch"'
     ctr_exec 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman && GOCACHE=/buildhome/gocache GOPATH=/buildhome/gopath GOPROXY=off go build -o /buildhome/fisherman/fisherman-bin ./cmd/fisherman && sudo install -Dm755 /buildhome/fisherman/fisherman-bin /usr/local/bin/fisherman"'
     sudo rm -f "$container_mntpoint"/usr/bin/fisherman
 
@@ -205,8 +211,8 @@ iso_prebuild_handoff() {
         --env ISO_ENVIRONMENT=true \
         --env GRUB_FILE_PATH=/grub.cfg \
         --env ISO_NAME="$ISO_NAME" \
-        -v "$REPO_DIR"/build_files/config/grub.cfg:/grub.cfg:ro \
-        -v "$REPO_DIR"/build_files/scripts/01-build.sh:/build_iso.sh:ro \
+        -v "$REPO_DIR"/config/grub.cfg:/grub.cfg:ro \
+        -v "$REPO_DIR"/scripts/01-build.sh:/build_iso.sh:ro \
         -v "$OUT_DIR":/out \
         -v "$container_mntpoint":/rootfs \
         quay.io/fedora/fedora:42 /build_iso.sh

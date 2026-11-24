@@ -23,7 +23,7 @@ runs:
   steps:
     - name: Build ISO
       run: |
-        sudo ${{ github.action_path }}/build_files/scripts/00-start.sh ${{ inputs.container-image }} ${{ inputs.iso-path }} ${{ inputs.iso-name }}
+        sudo ${{ github.action_path }}/scripts/00-start.sh ${{ inputs.container-image }} ${{ inputs.iso-path }} ${{ inputs.iso-name }}
         
         mkdir -p ${{ inputs.iso-path }}
         sudo chown -R $(whoami):$(whoami) ${{ inputs.iso-path }}
