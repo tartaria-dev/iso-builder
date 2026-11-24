@@ -29,7 +29,7 @@ squashfs_ctr_img=$1
 
 ### set constants
 
-REPO_DIR=$(dirname "$0")/../..
+REPO_DIR=$(dirname "$0")/..
 OUT_DIR=$2
 ISO_NAME=$3
 
@@ -91,9 +91,6 @@ iso_container_sysconf() {
 
     ctr_exec 'ln -sf /usr/share/zoneinfo/UTC /etc/localtime && mkdir -p /var/tmp'
 
-    # debug
-    ctr_exec 'ls /app'
-
     ctr_exec 'rsync -rltDxv /app/files/ /'
 
     if [[ "$ISO_NAME" == *saffron || "$ISO_NAME" == *maraska ]]; then
@@ -128,7 +125,7 @@ iso_container_installconf() {
 
     ctr_exec 'runuser -u builder -- bash -c "git clone --quiet --depth 1 --revision 5a98ec827fa370d48da69ecf4af3200f20980ce2 https://github.com/tuna-os/fisherman /buildhome/fisherman && cd /buildhome/fisherman && git apply /app/patches/fm*.patch"'
     ctr_exec 'runuser -u builder -- bash -c "cd /buildhome/fisherman/fisherman && GOCACHE=/buildhome/gocache GOPATH=/buildhome/gopath GOPROXY=off go build -o /buildhome/fisherman/fisherman-bin ./cmd/fisherman && sudo install -Dm755 /buildhome/fisherman/fisherman-bin /usr/local/bin/fisherman"'
-    sudo rm -f "$container_mntpoint"/usr/bin/fisherman
+    sudo rm -f "$container_mntpoint"/usr/bin/fisherman # doesn't work if executed in the container for whatever reason
 
     ctr_exec 'userdel builder && rm -rf /buildhome /etc/sudoers.d/builder'
     ctr_exec 'pacman -Rns --noconfirm ninja meson blueprint-compiler go'
