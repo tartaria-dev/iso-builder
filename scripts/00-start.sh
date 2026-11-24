@@ -93,8 +93,8 @@ iso_container_sysconf() {
 
     ctr_exec 'rsync -rltDxv /app/files/ /'
 
-    if [[ "$ISO_NAME" == *saffron || "$ISO_NAME" == *maraska ]]; then
-        ctr_exec 'cp /app/config/settings.json /usr/share/tartaria/cherries/dot_config/dms/'
+    if [[ "$ISO_NAME" == *saffron || "$ISO_NAME" == *amchoor ]]; then
+        ctr_exec 'cp /app/config/settings.json /usr/share/tartaria/cherries/dot_config/dms/settings.json'
     else
         ctr_exec 'cp /app/config/settings.toml /usr/share/tartaria/cherries/dot_local/state/noctalia/settings.toml'
     fi
