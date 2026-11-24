@@ -91,6 +91,9 @@ iso_container_sysconf() {
 
     ctr_exec 'ln -sf /usr/share/zoneinfo/UTC /etc/localtime && mkdir -p /var/tmp'
 
+    # debug
+    ctr_exec 'ls /app'
+
     ctr_exec 'rsync -rltDxv /app/files/ /'
 
     if [[ "$ISO_NAME" == *saffron || "$ISO_NAME" == *maraska ]]; then
