@@ -87,7 +87,7 @@ iso_container_sysconf() {
 
     ctr_exec 'mkdir -p /etc/bootc-installer'
 
-    ctr_exec 'rm -rf /usr/lib/subsystem/rootfs/rootfs.dsk /usr/lib/flatpak-sysapps/flatpak-sysapps.dsk'
+    ctr_exec 'rm -rf /usr/lib/subsystem/segments/*.dsk'
 
     ctr_exec 'ln -sf /usr/share/zoneinfo/UTC /etc/localtime && mkdir -p /var/tmp'
 
