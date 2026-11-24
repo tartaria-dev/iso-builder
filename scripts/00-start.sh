@@ -91,7 +91,7 @@ iso_container_sysconf() {
 
     ctr_exec 'ln -sf /usr/share/zoneinfo/UTC /etc/localtime && mkdir -p /var/tmp'
 
-    rsync -rltDxv "$REPO_DIR"/files/ "$container_mntpoint"/
+    ctr_exec 'rsync -rltDxv /app/files/ /'
 
     if [[ "$ISO_NAME" == *saffron || "$ISO_NAME" == *maraska ]]; then
         ctr_exec 'cp /app/config/settings.json /usr/share/tartaria/cherries/dot_config/dms/'
